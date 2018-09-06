@@ -10,6 +10,7 @@ public class SoundChannel{
     private int fadeSteps = 60;
     private State state;
     private Autoplayer autoplay;
+    private boolean skipOnFadeComplete;
     SoundChannel(SoundSystem sys, String channelName){
         this.sys = sys;
         this.name = channelName;
@@ -33,6 +34,7 @@ public class SoundChannel{
                 break;
         }
         if(state==State.STOPPED){
+            if(fadeProgress>=0&&!skipOnFadeComplete) autoplay = null;//Music is fading out; song has ended.  Prevent the next song from starting.
             fadeProgress = -1;
             if(autoplay!=null) tryAutoplay();
         }
@@ -40,11 +42,18 @@ public class SoundChannel{
             if(fadeProgress>=0){
                 fadeProgress++;
                 if(fadeProgress>=fadeSteps){
-                    pause();
+                    if(skipOnFadeComplete){
+                        skipOnFadeComplete = false;
+                        Autoplayer auto = autoplay;
+                        stop();
+                        autoplay(auto);//Don't reset playback volume- that will be auto-reset by the autoplay.
+                    }else{
+                        pause();
+                        AL10.alSourcef(src, AL10.AL_GAIN, volume*sys.getMasterVolume());//Reset playback volume after fade
+                    }
                     fadeProgress = -1;
-                    AL10.alSourcef(src, AL10.AL_GAIN, volume*sys.getMasterVolume());//Reset playback volume after fade
                 }else{
-                    AL10.alSourcef(src, AL10.AL_GAIN, volume*sys.getMasterVolume()*(fadeProgress/(float)fadeSteps));
+                    AL10.alSourcef(src, AL10.AL_GAIN, volume*sys.getMasterVolume()*(float)Math.pow(2, -6f*fadeProgress/fadeSteps));
                 }
             }
         }
@@ -68,6 +77,9 @@ public class SoundChannel{
         autoplay = null;
         fadeProgress = -1;
     }
+    /**
+     * Fades the music.  Channel will be PAUSED when fade is complete.
+     */
     public synchronized void fade(int sixtiethsOfASecond){
         fadeProgress = 0;
         fadeSteps = sixtiethsOfASecond;
@@ -97,11 +109,20 @@ public class SoundChannel{
             Util.checkALError();
         }catch(Exception ex){}
         AL10.alSourceQueueBuffers(src, buffer);
+        AL10.alSourcef(src, AL10.AL_GAIN, volume*sys.getMasterVolume());
         return play();
     }
     public synchronized boolean loop(String sound){
         return play(sound, true);
     }
+    /**
+     * Sets the autoplay.
+     * NOTE:  This will NOT effect a playing channel until the current song completes.
+     * If your channel is looping, this will NOT take effect unless setLooping(false) is called; a call to stop() clears autoplay status as well.
+     * Any channel that reports a STOPPED status (song end) while autoplay is set will automatically invoke the autoplay for the next song.
+     * Note that a PAUSED channel will stay paused; current song will not be changed until STOPPED status acquires through the end of the song.
+     * The skip() and fadeSkip() functions can be used to force an early end to a track on an autoplaying source.
+     */
     public synchronized void autoplay(Autoplayer source){
         this.autoplay = source;
     }
@@ -109,7 +130,7 @@ public class SoundChannel{
      * Set the volume, ranging from 0 (0%) to 1 (100%).
      */
     public synchronized void setVolume(float volume){
-        this.volume = Math.min(0, Math.max(1, volume));
+        this.volume = Math.max(0, Math.min(1, volume));
         AL10.alSourcef(src, AL10.AL_GAIN, volume*sys.getMasterVolume());
     }
     private void tryAutoplay(){
@@ -119,13 +140,24 @@ public class SoundChannel{
         doPlay(sound, false, autoplay);
     }
     void updateMasterVolume(){
-        if(state==State.PLAYING&&fadeProgress==0){
+        if(state==State.PLAYING&&fadeProgress==-1){
             setVolume(volume);
         }
     }
     private enum State{PLAYING, PAUSED, STOPPED}
+    /**
+     * NOTE:  Does nothing if not autoplaying.
+     */
     public void skip(){
         if(autoplay==null) return;//Skip only works in autoplay mode
         tryAutoplay();
+    }
+    /**
+     * Fades the music.  Channel will be STOPPED when fade is complete, but autoplay status WILL NOT be cleared.
+     * If this channel is in autoplay, the autoplayer will be invoked from this status and the next song will be started.
+     */
+    public void fadeSkip(int sixtiethsOfASecond){
+        fade(sixtiethsOfASecond);
+        skipOnFadeComplete = true;
     }
 }

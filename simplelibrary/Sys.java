@@ -42,7 +42,6 @@ public class Sys{
     private static UncaughtExceptionHandler uncaughtExceptionHandler;
     private static boolean useLWJGL;
     public static ErrorList suppressedErrors = new ErrorList();
-
     /**
      * @return the LWJGL flag; as in, if SimpleLibrary will use LWJGL where it can but doesn't have to
      */

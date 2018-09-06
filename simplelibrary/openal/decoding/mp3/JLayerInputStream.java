@@ -100,6 +100,19 @@ public class JLayerInputStream extends DecodedAudioInputStream{
         if(back.available()==0) return -1;
         return back.read();
     }
+    @Override
+    public int read(byte[] b, int off, int len) throws IOException{
+        int read = 0;
+        while(back.available()==0&&!readComplete){
+            synchronized(""){
+                try{
+                    "".wait(1);
+                }catch(InterruptedException ex){}
+            }
+        }
+        if(back.available()==0) return -1;
+        return back.read(b, off, Math.min(len, back.available()));
+    }
     void newData(byte[] buffer, short len){
         circle.write(buffer, 0, len);
     }

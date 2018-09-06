@@ -28,8 +28,8 @@ public class SoundStash{
     private static final HashMap<String, Integer> sources = new HashMap<>();
     public static String lastError;
     public static Exception lastException;
-    private static ByteBuffer soundData = createDirectByteBuffer(16_777_216);
-    private static int dataLength = 16_777_216;
+    private static ByteBuffer soundData = createDirectByteBuffer(67_108_864);
+    private static int dataLength = 67_108_864;
     private static boolean expanding;
     public static ByteBuffer createDirectByteBuffer(int bufferSize){
         return ByteBuffer.allocateDirect(bufferSize).order(ByteOrder.nativeOrder());
@@ -39,6 +39,10 @@ public class SoundStash{
         dataLength*=2;
         if(size>dataLength) dataLength = size;
         soundData = createDirectByteBuffer(dataLength);
+    }
+    public static boolean hasBuffer(String filepath){
+        if(filepath==null||filepath.isEmpty()) return false;
+        return sounds.containsKey(filepath);
     }
     public static int getBuffer(String filepath){
         if(filepath==null||filepath.isEmpty()){

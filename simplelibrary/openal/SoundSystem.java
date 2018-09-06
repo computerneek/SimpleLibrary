@@ -30,6 +30,7 @@ public class SoundSystem{
     private final Thread loop;
     private boolean running = true;
     private float masterVolume = 1;
+    private float sfxVolume = 1;
     /**
      * Initializes the soundsystem with prefix "/" and suffix ".wav" and NO predefined main sound channels (music, etc.)
      */
@@ -98,7 +99,7 @@ public class SoundSystem{
         }
         int src = SoundStash.getSource("SFX source "+sfxChannel);
         AL10.alSourceStop(src);
-        AL10.alSourcef(src, AL10.AL_GAIN, volume*masterVolume);
+        AL10.alSourcef(src, AL10.AL_GAIN, volume*masterVolume*sfxVolume);
         try{
             AL10.alSourceUnqueueBuffers(src);
             Util.checkALError();
@@ -106,7 +107,11 @@ public class SoundSystem{
         AL10.alSourceQueueBuffers(src, getSound(sfxPrefix+sound+sfxSuffix));
         AL10.alSourcePlay(src);
     }
-    public synchronized int getSound(String filepath){
+    public int getSound(String filepath){
+        if(SoundStash.hasBuffer(filepath)) return SoundStash.getBuffer(filepath);
+        return getSound_do(filepath);
+    }
+    private synchronized int getSound_do(String filepath){
         int name = SoundStash.getBuffer(filepath);
         if(name==0){
             if(SoundStash.lastException!=null&&SoundStash.lastException instanceof UnsupportedAudioFileException){
@@ -166,7 +171,7 @@ public class SoundSystem{
     public float getMasterVolume(){
         return masterVolume;
     }
-    public void setMasterVolume(float vol){
+    public synchronized void setMasterVolume(float vol){
         float last = masterVolume;
         masterVolume = vol;
         for(int i = 0; i<sfxChannels; i++){
@@ -174,6 +179,16 @@ public class SoundSystem{
         }
         for(SoundChannel c : channels.values()){
             c.updateMasterVolume();
+        }
+    }
+    public float getSFXVolume(){
+        return sfxVolume;
+    }
+    public synchronized void setSFXVolume(float vol){
+        float last = sfxVolume;
+        sfxVolume = last;
+        for(int i = 0; i<sfxChannels; i++){
+            updateSFXVolume(i+1, last, vol);
         }
     }
     private void updateSFXVolume(int channel, float prevMaster, float newMaster){
