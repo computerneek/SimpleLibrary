@@ -11,6 +11,10 @@ public class SoundChannel{
     private State state;
     private Autoplayer autoplay;
     private boolean skipOnFadeComplete;
+    private String lastSound;
+    private long nanoPlayTime;
+    private long nanoPauseTime;
+    private String nextSong;
     SoundChannel(SoundSystem sys, String channelName){
         this.sys = sys;
         this.name = channelName;
@@ -47,6 +51,8 @@ public class SoundChannel{
                         Autoplayer auto = autoplay;
                         stop();
                         autoplay(auto);//Don't reset playback volume- that will be auto-reset by the autoplay.
+                    }else if(nextSong!=null){
+                        play(nextSong);
                     }else{
                         pause();
                         AL10.alSourcef(src, AL10.AL_GAIN, volume*sys.getMasterVolume());//Reset playback volume after fade
@@ -62,12 +68,18 @@ public class SoundChannel{
      * Resumes a paused channel, or restarts a playing/stopped channel.
      */
     public synchronized boolean play(){
+        if(AL10.alGetSourcei(src, AL10.AL_SOURCE_STATE)==AL10.AL_PLAYING) return true;//Already playing, nothing to do
         AL10.alSourcePlay(src);
-        return AL10.alGetSourcei(src, AL10.AL_SOURCE_STATE)==AL10.AL_PLAYING;
+        boolean val = AL10.alGetSourcei(src, AL10.AL_SOURCE_STATE)==AL10.AL_PLAYING;
+        if(val) nanoPlayTime+=System.nanoTime()-nanoPauseTime;//For accurate playhead positioning
+        return val;
     }
     public synchronized boolean pause(){
+        if(AL10.alGetSourcei(src, AL10.AL_SOURCE_STATE)==AL10.AL_PAUSED) return true;//Already paused, nothing to do
         AL10.alSourcePause(src);
-        return AL10.alGetSourcei(src, AL10.AL_SOURCE_STATE)==AL10.AL_PAUSED;
+        boolean val = AL10.alGetSourcei(src, AL10.AL_SOURCE_STATE)==AL10.AL_PAUSED;
+        if(val) nanoPauseTime = System.nanoTime();//Remember when we pause, for accurate playhead positioning
+        return val;
     }
     /**
      * Stops the music, also cancels autoplay
@@ -76,6 +88,7 @@ public class SoundChannel{
         AL10.alSourceStop(src);
         autoplay = null;
         fadeProgress = -1;
+        nextSong = null;
     }
     /**
      * Fades the music.  Channel will be PAUSED when fade is complete.
@@ -110,6 +123,8 @@ public class SoundChannel{
         }catch(Exception ex){}
         AL10.alSourceQueueBuffers(src, buffer);
         AL10.alSourcef(src, AL10.AL_GAIN, volume*sys.getMasterVolume());
+        lastSound = sound;
+        nanoPlayTime = nanoPauseTime = System.nanoTime();
         return play();
     }
     public synchronized boolean loop(String sound){
@@ -125,6 +140,9 @@ public class SoundChannel{
      */
     public synchronized void autoplay(Autoplayer source){
         this.autoplay = source;
+        //Prevent previously set fadeTo() from damaging newly set autoplay()
+        if(nextSong!=null) skipOnFadeComplete = true;
+        nextSong = null;
     }
     /**
      * Set the volume, ranging from 0 (0%) to 1 (100%).
@@ -159,5 +177,27 @@ public class SoundChannel{
     public void fadeSkip(int sixtiethsOfASecond){
         fade(sixtiethsOfASecond);
         skipOnFadeComplete = true;
+        nextSong = null;
+    }
+    /**
+     * Fades the music.  <code>play(String)</code> will be called with <code>nextSong</code> when fade is complete; any autoplay status will be cleared.
+     */
+    public void fadeTo(int sixtiethsOfASecond, String nextSong){
+        fade(sixtiethsOfASecond);
+        this.nextSong = nextSong;
+    }
+    public int getLastSoundLength(){
+        if(lastSound==null) return -1;
+        return SoundStash.getMillisecondDuration(lastSound);
+    }
+    public int getPlayheadPosition(){
+        int state = AL10.alGetSourcei(src, AL10.AL_SOURCE_STATE);
+        if(state==AL10.AL_PLAYING) return (int)((System.nanoTime()-nanoPlayTime)/1000000);
+        if(state==AL10.AL_PAUSED) return (int)((nanoPauseTime-nanoPlayTime)/1000000);
+        return -1;
+    }
+    public String getCurrentSound(){
+        if(getPlayheadPosition()>=0) return lastSound;
+        else return null;
     }
 }

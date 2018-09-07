@@ -25,6 +25,7 @@ import static org.lwjgl.openal.AL10.alGenBuffers;
 import static org.lwjgl.openal.AL10.alGenSources;
 public class SoundStash{
     private static final HashMap<String, Integer> sounds = new HashMap<>();
+    private static final HashMap<String, Integer> lengths = new HashMap<>();
     private static final HashMap<String, Integer> sources = new HashMap<>();
     public static String lastError;
     public static Exception lastException;
@@ -75,12 +76,14 @@ public class SoundStash{
             return;
         }
         alDeleteBuffers(sounds.remove(filepath));
+        lengths.remove(filepath);
     }
     public static void clearBuffers(){
         for(Integer val : sounds.values()){
             alDeleteBuffers(val);
         }
         sounds.clear();
+        lengths.clear();
     }
     public static int getSource(String name){
         if(sources.containsKey(name)){
@@ -90,6 +93,9 @@ public class SoundStash{
             sources.put(name, source);
             return source;
         }
+    }
+    public static int getMillisecondDuration(String name){
+        return lengths.containsKey(name)?lengths.get(name):-1;
     }
     public static void removeSource(String name){
         if(!sources.containsKey(name)){
@@ -156,15 +162,17 @@ public class SoundStash{
                 }
             }
             if(expanding){
-                Sys.error(ErrorLevel.warning, "Read complete; data size "+(dataLength-soundData.remaining())+"B", null, ErrorCategory.audio);
+                Sys.error(ErrorLevel.warning, "Read complete; data size "+(soundData.limit())+"B", null, ErrorCategory.audio);
                 expanding = false;
             }
         }
         soundData.flip();
+        int length = soundData.limit();
         int name = alGenBuffers();
         alBufferData(name, alFormat, soundData, (int)sampleRate);
         Util.checkALError();
         sounds.put(filepath, name);
+        lengths.put(filepath, (int)(length*1000L/(int)sampleRate/channels/(sampleSize/8)));//Store the millisecond length of the track
         return name;
     }
 }
