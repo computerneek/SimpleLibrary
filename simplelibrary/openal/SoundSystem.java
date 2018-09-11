@@ -20,6 +20,7 @@ import simplelibrary.error.ErrorLevel;
 import simplelibrary.openal.decoding.AudioDecoder;
 import simplelibrary.openal.decoding.DecodedAudioInputStream;
 import simplelibrary.openal.decoding.mp3.JLayerAudioDecoder;
+import simplelibrary.texture.TexturePackManager;
 public class SoundSystem{
     private int sfxChannel;
     private final int sfxChannels;
@@ -126,13 +127,13 @@ public class SoundSystem{
         return name;
     }
     private int tryDecodeSound(String filepath){
-        try(BufferedInputStream in = new BufferedInputStream(new FileInputStream(filepath))){
+        try(BufferedInputStream in = new BufferedInputStream(TexturePackManager.instance.currentTexturePack.getResourceAsStream(filepath))){
             for(AudioDecoder d : decoders){
                 DecodedAudioInputStream din = d.getInputStream(in);
                 if(din==null) continue;
                 return decodeSound(filepath, din);
             }
-        }catch(IOException ex){
+        }catch(IOException|NullPointerException ex){
             Sys.error(ErrorLevel.moderate, "Could not access required audio file!", ex, ErrorCategory.audio);
             return 0;
         }

@@ -38,7 +38,22 @@ public class SoundChannel{
                 break;
         }
         if(state==State.STOPPED){
-            if(fadeProgress>=0&&!skipOnFadeComplete) autoplay = null;//Music is fading out; song has ended.  Prevent the next song from starting.
+            if(fadeProgress>=0&&!skipOnFadeComplete){//Music is fading out; song has ended.  Prevent the next song from starting.
+                //However, do NOT cancel autoplay- and we must allow for the possibility of a fadeTo()!
+                //To do this, we:
+                //If in autoplay, run the autoplay and immediately pause and reset fade status.  Channel will be paused at the beginning of the next track.
+                //IF the autoplayer pops a null, we have no choice but to disable autoplay to prevent continued play.
+                //If in fadeTo(), play the next song.
+                fadeProgress = -1;//Stop the fade
+                if(nextSong!=null){
+                    doPlay(nextSong, false, autoplay);//We're in fadeTo(); play next song without cancelling autoplay.
+                    nextSong = null;//Clear next song.
+                }else if(autoplay!=null){
+                    tryAutoplay();//We're in standard autoplay, fading out.  Skip to next song.
+                    if(AL10.alGetSourcei(src, AL10.AL_SOURCE_STATE)==AL10.AL_PLAYING) pause();//If next song started successfully, pause the music.
+                    else autoplay = null;//Autoplay has one chance.  No value came back, cancel autoplay.
+                }
+            }
             fadeProgress = -1;
             if(autoplay!=null) tryAutoplay();
         }
@@ -52,7 +67,8 @@ public class SoundChannel{
                         stop();
                         autoplay(auto);//Don't reset playback volume- that will be auto-reset by the autoplay.
                     }else if(nextSong!=null){
-                        play(nextSong);
+                        doPlay(nextSong, false, autoplay);
+                        nextSong = null;
                     }else{
                         pause();
                         AL10.alSourcef(src, AL10.AL_GAIN, volume*sys.getMasterVolume());//Reset playback volume after fade
@@ -94,7 +110,7 @@ public class SoundChannel{
      * Fades the music.  Channel will be PAUSED when fade is complete.
      */
     public synchronized void fade(int sixtiethsOfASecond){
-        fadeProgress = 0;
+        fadeProgress = Math.max(0, fadeProgress);
         fadeSteps = sixtiethsOfASecond;
     }
     public synchronized boolean isFading(){
@@ -180,7 +196,7 @@ public class SoundChannel{
         nextSong = null;
     }
     /**
-     * Fades the music.  <code>play(String)</code> will be called with <code>nextSong</code> when fade is complete; any autoplay status will be cleared.
+     * Fades the music.  When fade is complete, SoundChannel will behave as if <code>play(String)</code> were called, except that autoplay status will NOT be cleared.
      */
     public void fadeTo(int sixtiethsOfASecond, String nextSong){
         fade(sixtiethsOfASecond);

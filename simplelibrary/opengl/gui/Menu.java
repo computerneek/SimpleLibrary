@@ -1,10 +1,6 @@
 package simplelibrary.opengl.gui;
-import java.awt.Component;
 import java.util.ArrayList;
-import java.util.Arrays;
-import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.Display;
-import org.lwjgl.opengl.GL11;
 import simplelibrary.game.GameHelper;
 import simplelibrary.opengl.ImageStash;
 import simplelibrary.opengl.Renderer2D;

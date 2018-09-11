@@ -5,7 +5,6 @@ import java.awt.Dimension;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.JFrame;
 import org.lwjgl.LWJGLException;
@@ -77,8 +76,8 @@ public class GameHelper extends Thread{
     private boolean depthTestEnabled;
     private boolean is2D;
     private boolean rebuildRenderSetup;
-    private float minRenderDistance = -0.1F;
-    private float maxRenderDistance = -100F;
+    private float minRenderDistance = 0.1F;
+    private float maxRenderDistance = 100F;
     private boolean usingFramebuffer;
     private int stackDepthAtFramebuffer = -1;
     private int boundDepthAtFramebuffer = -1;
@@ -393,7 +392,7 @@ public class GameHelper extends Thread{
             case MODE_3D:
             case MODE_HYBRID:
                 float aspect = width / (float)height;
-                GL11.glOrtho(-guiScale, guiScale, -guiScale, guiScale, minRenderDistance, maxRenderDistance);
+                GL11.glOrtho(-guiScale, guiScale, -guiScale, guiScale, -minRenderDistance, -maxRenderDistance);
                 GLU.gluPerspective(frameOfView, aspect, (float)minRenderDistance, (float)maxRenderDistance);
                 break;
             case MODE_2D:
