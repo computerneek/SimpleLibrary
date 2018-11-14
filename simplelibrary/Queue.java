@@ -93,16 +93,32 @@ public class Queue<T> implements Iterable<T>{
     @Override
     public Iterator<T> iterator() {
         return new Iterator<T>() {
-            QueueEntry next = head;
+            QueueEntry last = null;
+            QueueEntry previous = null;
+            boolean removed = true;
             @Override
             public boolean hasNext() {
-                return next!=null;
+                return (last==null&&head!=null)||(last!=null&&last.next!=null);
             }
             @Override
             public T next() {
-                T obj = next.obj;
-                next = next.next;
+                T obj = (last==null?head.obj:last.next.obj);
+                previous = last;
+                removed = false;
+                last = (last==null?head:last.next);
                 return obj;
+            }
+            @Override
+            public void remove(){
+                if(removed) return;
+                removed = true;
+                if(last==head) head = last.next;//Removing the first entry
+                else if(previous!=null){
+                    previous.next = last.next;//Removing second through last entries
+                    //If we remove the last entry, last.next==null will be true- so setting previous.next=null will drop the last entry.
+                    if(previous.next==null) tail = previous;
+                }
+                size--;
             }
         };
     }

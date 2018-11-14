@@ -88,6 +88,13 @@ public class ConfigList extends ConfigBase{
         if(index>=0&&index<size()) lst.remove(index);
         return val;
     }
+    public boolean contains(Object value){
+        if(value==null) return false;//Block null
+        for(ConfigBase b : lst){
+            if(b.getData().equals(value)) return true;
+        }
+        return false;
+    }
     public void add(Config value){
         doAdd(value);
     }

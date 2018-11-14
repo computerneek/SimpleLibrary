@@ -116,4 +116,13 @@ public class JLayerInputStream extends DecodedAudioInputStream{
     void newData(byte[] buffer, short len){
         circle.write(buffer, 0, len);
     }
+    @Override
+    public void close() throws IOException{
+        try{
+            stream.close();
+            back.close();
+        }catch(BitstreamException ex){
+            throw new IOException(ex);
+        }
+    }
 }

@@ -1,7 +1,7 @@
 font height=20
 font name=font
 font type=ASCII
-char_20_width=10= 
+char_20_width=6= 
 char_21_width=4=!
 char_22_width=10="
 char_23_width=13=#
@@ -9,8 +9,8 @@ char_24_width=10=$
 char_25_width=12=%
 char_26_width=13=&
 char_27_width=5='
-char_28_width=10=(
-char_29_width=10=)
+char_28_width=6=(
+char_29_width=6=)
 char_2A_width=7=*
 char_2B_width=10=+
 char_2C_width=5=,
@@ -33,7 +33,7 @@ char_3C_width=12=<
 char_3D_width=10==
 char_3E_width=12=>
 char_3F_width=10=?
-char_40_width=20=@
+char_40_width=15=@
 char_41_width=10=A
 char_42_width=10=B
 char_43_width=10=C
@@ -64,7 +64,7 @@ char_5B_width=9=[
 char_5C_width=12=\
 char_5D_width=9=]
 char_5E_width=12=^
-char_5F_width=10=_
+char_5F_width=14=_
 char_60_width=7=`
 char_61_width=10=a
 char_62_width=10=b

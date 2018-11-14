@@ -10,6 +10,7 @@ public class CircularStream extends OutputStream{
     private int dataEnd = 0;//First INVALID byte
     private boolean isEmpty = true;
     private int maxBufferSize;
+    private boolean closed = false;
     private CircularStreamInput in = new CircularStreamInput();
     public CircularStream(int maxBufferSize){
         this.maxBufferSize = maxBufferSize;
@@ -18,7 +19,8 @@ public class CircularStream extends OutputStream{
     @Override
     public void write(int b){
         synchronized(buffer){
-            while(getBufferSize()>=maxBufferSize) try{ buffer.wait(); }catch(InterruptedException ex){}
+            while(getBufferSize()>=maxBufferSize&&!closed) try{ buffer.wait(); }catch(InterruptedException ex){}
+            if(closed) return;
             if(dataEnd==buffer.length) dataEnd = 0;
             buffer[dataEnd]=(byte)b;
             dataEnd++;
@@ -34,8 +36,9 @@ public class CircularStream extends OutputStream{
     @Override
     public void write(byte[] b, int offset, int length){
         synchronized(buffer){
-            while(length>0){
-                while(getBufferSize()>=maxBufferSize) try{ buffer.wait(); }catch(InterruptedException ex){}
+            while(length>0&&!closed){
+                while(getBufferSize()>=maxBufferSize&&!closed) try{ buffer.wait(); }catch(InterruptedException ex){}
+                if(closed) return;
                 if(dataEnd==buffer.length) dataEnd = 0;
                 int canWrite = Math.min(maxBufferSize-dataEnd, maxBufferSize-getBufferSize());
                 int toWrite = Math.min(canWrite, length);
@@ -51,12 +54,16 @@ public class CircularStream extends OutputStream{
     public CircularStreamInput getInput(){
         return in;
     }
+    public void close(){
+        closed = true;
+        synchronized(buffer){ buffer.notifyAll(); }
+    }
     public class CircularStreamInput extends InputStream{
-        private ByteArrayInputStream in;
         @Override
         public int read(){
             synchronized(buffer){
-                while(getBufferSize()<1) try{ buffer.wait(); }catch(InterruptedException ex){}
+                while(getBufferSize()<1&&!closed) try{ buffer.wait(); }catch(InterruptedException ex){}
+                if(closed&&getBufferSize()<1) return -1;//EOF
                 if(dataStart==buffer.length) dataStart = 0;
                 byte data = buffer[dataStart];
                 dataStart++;
@@ -74,7 +81,8 @@ public class CircularStream extends OutputStream{
             synchronized(buffer){
                 int read = 0;
                 while(read<1||(length>0&&getBufferSize()>0)){
-                    while(getBufferSize()<1) try{ buffer.wait(); }catch(InterruptedException ex){}
+                    while(getBufferSize()<1&&!closed) try{ buffer.wait(); }catch(InterruptedException ex){}
+                    if(closed&&getBufferSize()<1) return read>0?read:-1;//EOF
                     if(dataStart==buffer.length) dataStart = 0;
                     int canRead = Math.min(maxBufferSize-dataStart, getBufferSize());
                     int toRead = Math.min(canRead, length);
@@ -88,6 +96,10 @@ public class CircularStream extends OutputStream{
                 }
                 return read;
             }
+        }
+        @Override
+        public void close(){
+            CircularStream.this.close();
         }
     }
 }

@@ -9,12 +9,14 @@ public class SoundChannel{
     private int fadeProgress = -1;
     private int fadeSteps = 60;
     private State state;
-    private Autoplayer autoplay;
+    Autoplayer autoplay;
     private boolean skipOnFadeComplete;
-    private String lastSound;
+    String lastSound;
+    Song lastSong;
     private long nanoPlayTime;
     private long nanoPauseTime;
-    private String nextSong;
+    private String nextSound;
+    private Song nextSong;
     SoundChannel(SoundSystem sys, String channelName){
         this.sys = sys;
         this.name = channelName;
@@ -45,13 +47,22 @@ public class SoundChannel{
                 //IF the autoplayer pops a null, we have no choice but to disable autoplay to prevent continued play.
                 //If in fadeTo(), play the next song.
                 fadeProgress = -1;//Stop the fade
-                if(nextSong!=null){
+                if(nextSound!=null){
+                    Util.checkALError();
+                    doPlay(nextSound, false, autoplay);//We're in fadeTo(); play next song without cancelling autoplay.
+                    Util.checkALError();
+                    nextSound = null;//Clear next song.
+                }else if(nextSong!=null){
+                    Util.checkALError();
                     doPlay(nextSong, false, autoplay);//We're in fadeTo(); play next song without cancelling autoplay.
+                    Util.checkALError();
                     nextSong = null;//Clear next song.
                 }else if(autoplay!=null){
+                    Util.checkALError();
                     tryAutoplay();//We're in standard autoplay, fading out.  Skip to next song.
                     if(AL10.alGetSourcei(src, AL10.AL_SOURCE_STATE)==AL10.AL_PLAYING) pause();//If next song started successfully, pause the music.
                     else autoplay = null;//Autoplay has one chance.  No value came back, cancel autoplay.
+                    Util.checkALError();
                 }
             }
             fadeProgress = -1;
@@ -66,6 +77,9 @@ public class SoundChannel{
                         Autoplayer auto = autoplay;
                         stop();
                         autoplay(auto);//Don't reset playback volume- that will be auto-reset by the autoplay.
+                    }else if(nextSound!=null){
+                        doPlay(nextSound, false, autoplay);
+                        nextSound = null;
                     }else if(nextSong!=null){
                         doPlay(nextSong, false, autoplay);
                         nextSong = null;
@@ -88,6 +102,7 @@ public class SoundChannel{
         AL10.alSourcePlay(src);
         boolean val = AL10.alGetSourcei(src, AL10.AL_SOURCE_STATE)==AL10.AL_PLAYING;
         if(val) nanoPlayTime+=System.nanoTime()-nanoPauseTime;//For accurate playhead positioning
+        if(val) state = State.PLAYING;
         return val;
     }
     public synchronized boolean pause(){
@@ -95,6 +110,7 @@ public class SoundChannel{
         AL10.alSourcePause(src);
         boolean val = AL10.alGetSourcei(src, AL10.AL_SOURCE_STATE)==AL10.AL_PAUSED;
         if(val) nanoPauseTime = System.nanoTime();//Remember when we pause, for accurate playhead positioning
+        if(val) state = State.PAUSED;
         return val;
     }
     /**
@@ -104,7 +120,18 @@ public class SoundChannel{
         AL10.alSourceStop(src);
         autoplay = null;
         fadeProgress = -1;
+        nextSound = null;
         nextSong = null;
+        state = State.STOPPED;
+    }
+    void dequeue(){
+        AL10.alSourceStop(src);
+        state = State.STOPPED;
+        try{
+            AL10.alSourceUnqueueBuffers(src);
+            AL10.alSourcei(src, AL10.AL_BUFFER, 0);
+            Util.checkALError();
+        }catch(Exception ex){}
     }
     /**
      * Fades the music.  Channel will be PAUSED when fade is complete.
@@ -124,10 +151,16 @@ public class SoundChannel{
     public synchronized boolean play(String sound){
         return play(sound, false);
     }
+    public synchronized boolean play(Song sound){
+        return play(sound, false);
+    }
     public synchronized boolean play(String sound, boolean loop){
         return doPlay(sound, loop, null);
     }
-    private synchronized boolean doPlay(String sound, boolean loop, Autoplayer auto){
+    public synchronized boolean play(Song sound, boolean loop){
+        return doPlay(sound, loop, null);
+    }
+    synchronized boolean doPlay(String sound, boolean loop, Autoplayer auto){
         int buffer = sys.getSound(sound);
         if(buffer==0) return false;//Error loading the sound
         stop();
@@ -135,15 +168,30 @@ public class SoundChannel{
         autoplay = auto;
         try{
             AL10.alSourceUnqueueBuffers(src);
+            AL10.alSourcei(src, AL10.AL_BUFFER, 0);
             Util.checkALError();
         }catch(Exception ex){}
         AL10.alSourceQueueBuffers(src, buffer);
         AL10.alSourcef(src, AL10.AL_GAIN, volume*sys.getMasterVolume());
         lastSound = sound;
+        lastSong = null;
         nanoPlayTime = nanoPauseTime = System.nanoTime();
         return play();
     }
+    synchronized boolean doPlay(Song sound, boolean loop, Autoplayer auto){
+        setLooping(loop);
+        autoplay = auto;
+        sound.addPlayer(this);//This will take care of the rest
+        Util.checkALError();
+        play();
+        Util.checkALError();
+        return true;
+//        return play();
+    }
     public synchronized boolean loop(String sound){
+        return play(sound, true);
+    }
+    public synchronized boolean loop(Song sound){
         return play(sound, true);
     }
     /**
@@ -156,9 +204,6 @@ public class SoundChannel{
      */
     public synchronized void autoplay(Autoplayer source){
         this.autoplay = source;
-        //Prevent previously set fadeTo() from damaging newly set autoplay()
-        if(nextSong!=null) skipOnFadeComplete = true;
-        nextSong = null;
     }
     /**
      * Set the volume, ranging from 0 (0%) to 1 (100%).
@@ -168,10 +213,11 @@ public class SoundChannel{
         AL10.alSourcef(src, AL10.AL_GAIN, volume*sys.getMasterVolume());
     }
     private void tryAutoplay(){
-        String sound = autoplay.next();
+        Object sound = autoplay.next();
         if(sound==null) return;//Block null; if we allow a null filepath to propogate down to SoundSystem.getSound(), an error will be thrown.
         setVolume(autoplay.getVolume());
-        doPlay(sound, false, autoplay);
+        if(sound instanceof String) doPlay((String)sound, false, autoplay);
+        else doPlay((Song)sound, false, autoplay);
     }
     void updateMasterVolume(){
         if(state==State.PLAYING&&fadeProgress==-1){
@@ -193,6 +239,7 @@ public class SoundChannel{
     public void fadeSkip(int sixtiethsOfASecond){
         fade(sixtiethsOfASecond);
         skipOnFadeComplete = true;
+        nextSound = null;
         nextSong = null;
     }
     /**
@@ -200,11 +247,16 @@ public class SoundChannel{
      */
     public void fadeTo(int sixtiethsOfASecond, String nextSong){
         fade(sixtiethsOfASecond);
+        this.nextSound = nextSong;
+    }
+    public void fadeTo(int sixtiethsOfASecond, Song nextSong){
+        fade(sixtiethsOfASecond);
         this.nextSong = nextSong;
     }
     public int getLastSoundLength(){
-        if(lastSound==null) return -1;
-        return SoundStash.getMillisecondDuration(lastSound);
+        if(lastSound!=null) return SoundStash.getMillisecondDuration(lastSound);
+        if(lastSong!=null) return lastSong.getTotalLength();
+        return -1;
     }
     public int getPlayheadPosition(){
         int state = AL10.alGetSourcei(src, AL10.AL_SOURCE_STATE);
@@ -213,7 +265,10 @@ public class SoundChannel{
         return -1;
     }
     public String getCurrentSound(){
-        if(getPlayheadPosition()>=0) return lastSound;
+        if(getPlayheadPosition()>=0) return lastSound==null?lastSong.getPath():lastSound;
         else return null;
+    }
+    public String getName(){
+        return name;
     }
 }

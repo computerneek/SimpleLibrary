@@ -47,7 +47,6 @@ public class GameHelper extends Thread{
     private String windowTitle;
     public boolean running = true;
     private long lastTime;
-    private int timeToTick;
     private Color background = Color.BLACK;
     private float frameOfView = 45;
     private int lastWidth;
@@ -374,7 +373,7 @@ public class GameHelper extends Thread{
         }
         GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT | GL11.GL_STENCIL_BUFFER_BIT);
         GL11.glLoadIdentity();
-        Object value = callFunction("Render", renderMethod, renderObject, timeToTick);
+        Object value = callFunction("Render", renderMethod, renderObject, (int)(getTime()-tickTime));
         if(value!=null&&value instanceof Boolean&&(boolean)value){
             return;
         }

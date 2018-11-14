@@ -26,7 +26,7 @@ public class TexturePack {
      * @return if it has the specified resource
      */
     public boolean hasResource(String name){
-        try(InputStream in = TexturePack.class.getResourceAsStream(name)){
+        try(InputStream in = getResourceAsStream(name)){
             return in!=null;
         }catch(Exception ex){}
         return false;

@@ -44,6 +44,8 @@ public class GUI{
     public int type;
     private int fullscreenKey;
     private boolean hasFullscreenKey;
+    public float mouseX;
+    public float mouseY;
     /**
      * @param type The type of the GUI.  See <code>GameHelper.TYPE_2D, GameHelper.TYPE_2D_CENTERED, GameHelper.TYPE_3D</code>
      * @param helper The helper that the GUI is running on.  Can be null.  Used for automatic type shifting whenever the helper's type changes.
@@ -88,27 +90,14 @@ public class GUI{
         if(type==GameHelper.MODE_3D||type==GameHelper.MODE_HYBRID){
             helper.make3D();
         }
-        while(Keyboard.next()){
-            char character = Keyboard.getEventCharacter();
-            int key = Keyboard.getEventKey();
-            boolean pressed = Keyboard.getEventKeyState();
-            boolean isRepeat = Keyboard.isRepeatEvent();
-            if(menu!=null){
-                if(hasFullscreenKey&&key==fullscreenKey&&pressed&&!isRepeat){
-                    helper.toggleFullscreen();
-                }
-                try{
-                    menu.keyboardEvent(character, key, pressed, isRepeat);
-                }catch(Exception ex){
-                    theException = ex;
-                }
-            }
-            if(pressed&&!keyboardWereDown.contains(key)){
-                keyboardWereDown.add(key);
-            }else if(!pressed&&keyboardWereDown.contains(key)){
-                keyboardWereDown.remove((Integer)key);
-            }
+        theException=processKeyboard(theException);
+        theException=processMouse(theException);
+        if(theException!=null){
+            throw new RuntimeException(theException);
         }
+        doActions();
+    }
+    private Exception processMouse(Exception theException){
         boolean needsStatic = !mouseWereDown.isEmpty();
         while(Mouse.next()){
             needsStatic = false;
@@ -143,7 +132,9 @@ public class GUI{
                     y*=helper.guiScale;
                 }
                 try{
-                    menu.mouseEvent(button, pressed, x, y, xChange, yChange, wheelChange);
+                    mouseX = x;
+                    mouseY = y;
+                    mouseEvent(button, pressed, x, y, xChange, yChange, wheelChange);
                 }catch(Exception ex){
                     theException = ex;
                 }
@@ -182,16 +173,46 @@ public class GUI{
                     y*=helper.guiScale;
                 }
                 try{
-                    menu.persistMouseEvent(button, pressed, x, y);
+                    persistMouseEvent(button, pressed, x, y);
                 }catch(Exception ex){
                     theException = ex;
                 }
             }
         }
-        if(theException!=null){
-            throw new RuntimeException(theException);
+        return theException;
+    }
+    protected void persistMouseEvent(int button, boolean pressed, float x, float y){
+        menu.persistMouseEvent(button, pressed, x, y);
+    }
+    protected void mouseEvent(int button, boolean pressed, float x, float y, int xChange, int yChange, int wheelChange){
+        menu.mouseEvent(button, pressed, x, y, xChange, yChange, wheelChange);
+    }
+    private Exception processKeyboard(Exception theException){
+        while(Keyboard.next()){
+            char character = Keyboard.getEventCharacter();
+            int key = Keyboard.getEventKey();
+            boolean pressed = Keyboard.getEventKeyState();
+            boolean isRepeat = Keyboard.isRepeatEvent();
+            if(menu!=null){
+                if(hasFullscreenKey&&key==fullscreenKey&&pressed&&!isRepeat){
+                    helper.toggleFullscreen();
+                }
+                try{
+                    keyboardEvent(character, key, pressed, isRepeat);
+                }catch(Exception ex){
+                    theException = ex;
+                }
+            }
+            if(pressed&&!keyboardWereDown.contains(key)){
+                keyboardWereDown.add(key);
+            }else if(!pressed&&keyboardWereDown.contains(key)){
+                keyboardWereDown.remove((Integer)key);
+            }
         }
-        doActions();
+        return theException;
+    }
+    protected void keyboardEvent(char character, int key, boolean pressed, boolean isRepeat){
+        menu.keyboardEvent(character, key, pressed, isRepeat);
     }
     /**
      * Increments the <code>tick</code> variable and ticks the menu

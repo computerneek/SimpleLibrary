@@ -130,6 +130,7 @@ public class FontManager {
             type = "ascii";
         }else if(type.equalsIgnoreCase("Unicode")){
             type = "unicode";
+            //TODO Add Unicode_Segmented format; using 256 ASCII-size files, may or may not be present.
         }else{
             Sys.error(ErrorLevel.severe, "Invalid font type at "+baseFileName+"- "+type+" (Expected 'ascii' or 'unicode')!", null, ErrorCategory.config);
             return;

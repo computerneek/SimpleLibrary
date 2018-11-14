@@ -22,12 +22,14 @@ import simplelibrary.openal.decoding.DecodedAudioInputStream;
 import simplelibrary.openal.decoding.mp3.JLayerAudioDecoder;
 import simplelibrary.texture.TexturePackManager;
 public class SoundSystem{
+    private boolean autoUnloadDefault = true;
     private int sfxChannel;
     private final int sfxChannels;
     private final String sfxPrefix;
     private final String sfxSuffix;
     private final HashMap<String, SoundChannel> channels = new HashMap<>();
-    private static final ArrayList<AudioDecoder> decoders = new ArrayList<>();
+    private final HashMap<String, Song> songs = new HashMap<>();
+    static final ArrayList<AudioDecoder> decoders = new ArrayList<>();
     private final Thread loop;
     private boolean running = true;
     private float masterVolume = 1;
@@ -126,6 +128,27 @@ public class SoundSystem{
         }
         return name;
     }
+    /**
+     * Fetches a song for instant playback in a SoundChannel
+     * @param filepath Path to the sound file; Texture Pack Manager is used.
+     * @return Null if the song could not be read
+     */
+    public Song getSong(String filepath){
+        if(songs.containsKey(filepath)) return songs.get(filepath);
+        //What's the first thing we do, when reading a new song?  Check for a previous error.
+        try{
+            Util.checkALError();
+        }catch(RuntimeException ex){
+            Sys.error(ErrorLevel.severe, "OpenAL error detected prior to SoundSystem.getSong() call!", ex, ErrorCategory.audio);
+        }
+        try{
+            Song song = new Song(filepath, this);
+            songs.put(filepath, song);
+            return song;
+        }catch(IOException|NullPointerException ex){
+            return null;
+        }
+    }
     private int tryDecodeSound(String filepath){
         try(BufferedInputStream in = new BufferedInputStream(TexturePackManager.instance.currentTexturePack.getResourceAsStream(filepath))){
             for(AudioDecoder d : decoders){
@@ -144,30 +167,27 @@ public class SoundSystem{
         Util.checkALError();
         return SoundStash.allocateNew(in, filepath, in.getChannelCount(), in.getSampleSize(), in.getSampleRate());
     }
-    public synchronized boolean isPaused(String source){
-        return AL10.alGetSourcei(SoundStash.getSource(source), AL10.AL_PAUSED)==AL10.AL_TRUE;
-    }
-    public synchronized boolean isPlaying(String source){
-        return AL10.alGetSourcei(SoundStash.getSource(source), AL10.AL_PLAYING)==AL10.AL_TRUE;
-    }
     public void destroy(){
         running = false;
-        for(int i = 0; i<sfxChannels; i++){
-            SoundStash.removeSource("SFX source "+(i+1));
-        }
-        for(SoundChannel c : channels.values()){
-            c.destroy();
-        }
         try{
             loop.join();
         }catch(InterruptedException ex){}
+        for(Song s : songs.values()){
+            s.onDestroy();
+        }
+        SoundStash.clearSources();
+        SoundStash.clearBuffers();
         AL.destroy();
+    }
+    public boolean isAlive(){
+        return running;
     }
     public static void addDecoder(AudioDecoder decoder){
         decoders.add(decoder);
     }
     public synchronized void update(){
         for(SoundChannel c : channels.values()) c.update();
+        for(Song s : songs.values()) s.update();
     }
     public float getMasterVolume(){
         return masterVolume;
@@ -207,5 +227,11 @@ public class SoundSystem{
         }catch(ClassNotFoundException ex){
             return false;
         }
+    }
+    public void setDefaultAutoUnload(boolean def){
+        autoUnloadDefault = def;
+    }
+    boolean getAutoUnloadDefault(){
+        return autoUnloadDefault;
     }
 }

@@ -539,7 +539,7 @@ public class ConnectionManager implements AutoCloseable{
         }else if(socket==null&&(type&CONNECTION_CLIENT)==CONNECTION_CLIENT){
             socket = new Socket();
             socket.setSoTimeout(timeout);
-            socket.connect(new InetSocketAddress(host, port));
+            socket.connect(new InetSocketAddress(host, port), timeout);
             inbound = createMonitor("Inbound");
             outbound = createMonitor("Outbound");
         }else if((type&TYPE_FILE_IN)>0){
