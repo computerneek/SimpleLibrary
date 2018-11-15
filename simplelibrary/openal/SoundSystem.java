@@ -164,7 +164,11 @@ public class SoundSystem{
         return 0;
     }
     private int decodeSound(String filepath, DecodedAudioInputStream in) throws IOException{
-        Util.checkALError();
+        try{
+            Util.checkALError();
+        }catch(RuntimeException ex){
+            Sys.error(ErrorLevel.severe, "OpenAL error detected prior to SoundSystem.decodeSound() call!", ex, ErrorCategory.audio);
+        }
         return SoundStash.allocateNew(in, filepath, in.getChannelCount(), in.getSampleSize(), in.getSampleRate());
     }
     public void destroy(){
