@@ -133,7 +133,7 @@ public class SoundSystem{
      * @param filepath Path to the sound file; Texture Pack Manager is used.
      * @return Null if the song could not be read
      */
-    public Song getSong(String filepath){
+    public synchronized Song getSong(String filepath){
         if(songs.containsKey(filepath)) return songs.get(filepath);
         //What's the first thing we do, when reading a new song?  Check for a previous error.
         try{
