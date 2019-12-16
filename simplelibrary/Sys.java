@@ -42,6 +42,7 @@ public class Sys{
     private static UncaughtExceptionHandler uncaughtExceptionHandler;
     private static boolean useLWJGL;
     public static ErrorList suppressedErrors = new ErrorList();
+    private static ErrorCategory[] suppress = new ErrorCategory[0];
     /**
      * @return the LWJGL flag; as in, if SimpleLibrary will use LWJGL where it can but doesn't have to
      */
@@ -53,12 +54,12 @@ public class Sys{
      * @param level The level of the error
      * @param message A message to print in front of the error
      * @param error The exception.  If this is found to be null, it is set to <code>new UnknownError()</code> to allow for maximum error traceability.
-     * @param catagory The category of the error.
+     * @param category The category of the error.
      */
-    public static void error(ErrorLevel level, String message, Throwable error, ErrorCategory catagory){
-        error(level, message, error, catagory, log);
+    public static void error(ErrorLevel level, String message, Throwable error, ErrorCategory category){
+        error(level, message, error, category, log);
     }
-    public static void error(ErrorLevel level, String message, Throwable error, ErrorCategory catagory, boolean log){
+    public static void error(ErrorLevel level, String message, Throwable error, ErrorCategory category, boolean log){
         if(level==null&&error!=null){
             level = ErrorLevel.minor;
         }else if(level==null){
@@ -75,23 +76,29 @@ public class Sys{
         if(message==null){
             message = "";
         }
-        if(level==null||catagory==null){
+        if(level==null||category==null){
             String amessage = "";
-            if(level==null&&catagory==null){
+            if(level==null&&category==null){
                 amessage = "Error must be assigned a level and a catagory!";
             }else if(level==null){
                 amessage = "Error must be assigned a level!";
-            }else if(catagory==null){
+            }else if(category==null){
                 amessage = "Error must be assigned a catagory!";
             }
             error(ErrorLevel.severe, null, new IllegalArgumentException(amessage), ErrorCategory.bug);
             return;
         }
+        for(ErrorCategory c : suppress){
+            if(category==c){
+                suppress(level, message, error, category, log);
+                return;
+            }
+        }
         if(log){
             log(message, error);
         }
         //</editor-fold>
-        level.error(handler, message, error, catagory);
+        level.error(handler, message, error, category);
         if(suppressedErrors.getCount()>0){
             suppressedErrors.throwAll();
         }
@@ -101,6 +108,12 @@ public class Sys{
     }
     public static void suppress(ErrorLevel level, String message, Throwable error, ErrorCategory category, boolean log){
         suppressedErrors.add(level, message, error, category, log);
+    }
+    public static void suppressAll(ErrorCategory... categories){
+        if(categories!=null) suppress = categories;
+    }
+    public static boolean hasSuppressed(){
+        return suppressedErrors.getCount()>0;
     }
     /**
      * Generates a pseudorandom and probably unprintable string.  The return value is automatically added to the <code>generatedStrings</code> variable

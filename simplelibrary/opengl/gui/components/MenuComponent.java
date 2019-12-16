@@ -93,9 +93,6 @@ public abstract class MenuComponent extends Menu{
      * @param isDown If the acting button is up or down.  Will always be <code>false</code> when the button is -1.
      */
     public void mouseEvent(double x, double y, int button, boolean isDown){}
-    public void mouseWheelChange(int wheelChange){
-        parent.mouseWheelChange(wheelChange);
-    }
     public void mouseover(double x, double y, boolean isMouseOver){
         this.isMouseOver = isMouseOver;
         if(!isSelected&&selected!=null){
@@ -194,10 +191,10 @@ public abstract class MenuComponent extends Menu{
                 component.mouseover(-1, -1, false);
             }
         }
-        if(selected==null&&wheelChange!=0&&!found){
-            mouseWheelChange(wheelChange);
-        }else if(wheelChange!=0&&!found){
-            selected.mouseWheelChange(wheelChange);
+        if(wheelChange!=0&&!found){
+            if(selected==null||!selected.mouseWheelChange(wheelChange)){
+                mouseWheelChange(wheelChange);
+            }
         }
         if(!found){
             mouseover(x, y, true);

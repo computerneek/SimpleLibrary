@@ -1,12 +1,16 @@
 package simplelibrary;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.Spliterator;
+import java.util.Spliterators;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 import simplelibrary.net.packet.Packet;
 public class Queue<T> implements Iterable<T>{
     protected QueueEntry head;
     protected QueueEntry tail;
     protected int size;
-    public void enqueue(T obj){
+    public synchronized void enqueue(T obj){
         QueueEntry t = new QueueEntry(obj);
         if(head==null||tail==null){
             head = t;
@@ -18,7 +22,7 @@ public class Queue<T> implements Iterable<T>{
             size++;
         }
     }
-    public T dequeue(){
+    public synchronized T dequeue(){
         if(head==null){
             size = 0;
             return null;
@@ -28,13 +32,13 @@ public class Queue<T> implements Iterable<T>{
         size--;
         return obj;
     }
-    public T peek(){
+    public synchronized T peek(){
         if(head==null){
             return null;
         }
         return head.obj;
     }
-    public void clear(){
+    public synchronized void clear(){
         head = null;
         tail = null;
         size = 0;
@@ -103,7 +107,7 @@ public class Queue<T> implements Iterable<T>{
             @Override
             public T next() {
                 T obj = (last==null?head.obj:last.next.obj);
-                previous = last;
+                if(!removed) previous = last;//If it was removed, DO NOT update the previous!
                 removed = false;
                 last = (last==null?head:last.next);
                 return obj;
@@ -112,13 +116,15 @@ public class Queue<T> implements Iterable<T>{
             public void remove(){
                 if(removed) return;
                 removed = true;
-                if(last==head) head = last.next;//Removing the first entry
-                else if(previous!=null){
-                    previous.next = last.next;//Removing second through last entries
-                    //If we remove the last entry, last.next==null will be true- so setting previous.next=null will drop the last entry.
-                    if(previous.next==null) tail = previous;
+                synchronized(Queue.this){
+                    if(last==head) head = last.next;//Removing the first entry
+                    else if(previous!=null){
+                        previous.next = last.next;//Removing second through last entries
+                        //If we remove the last entry, last.next==null will be true- so setting previous.next=null will drop the last entry.
+                        if(previous.next==null) tail = previous;
+                    }
+                    size--;
                 }
-                size--;
             }
         };
     }
@@ -128,5 +134,11 @@ public class Queue<T> implements Iterable<T>{
         protected QueueEntry(T obj){
             this.obj = obj;
         }
+    }
+    public Spliterator<T> spliterator() {
+        return Spliterators.spliteratorUnknownSize(iterator(), Spliterator.ORDERED);
+    }
+    public Stream<T> stream() {
+        return StreamSupport.stream(spliterator(), false);
     }
 }

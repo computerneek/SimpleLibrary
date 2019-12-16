@@ -207,7 +207,17 @@ public class ImageStash{
         }
         return false;
     }
-    private void multithreadedInsert(String filename, BufferedImage image) {
+    /**
+     * Sets up a multithreaded insert.
+     * This uses the multithreading system, so can be called from any thread; provide the filename and the image.
+     * NOTE:  Recommended to use the straight String parameter function if possible.
+     * This is intended for generated, named textures.
+     * 
+     * When getTexture() is called on a texture name that hasn't been loaded, the multithreaded inserts are checked FIRST, before the file is looked for.
+     * @param filename
+     * @param image 
+     */
+    public void multithreadedInsert(String filename, BufferedImage image){
         multithreadedInserts.put(filename, image);
     }
     public int getBuffer(String name){

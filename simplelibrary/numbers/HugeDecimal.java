@@ -265,6 +265,7 @@ public class HugeDecimal implements Comparable<HugeDecimal>, Cloneable{
      * The precision is the number of digits after the decimal point.
      * For example, 42.275 has a precision of 3, 27.0 a precision of 1, and 7 a precision of 0.
      * Powers of 10 (and their multiples) are exceptions.  700 could have a precision from 0 to -2 inclusive.
+     * NOTE:  If the precision of the number is beyond Long.MAX_VALUE, (values below 10^Long.MIN_VALUE) this function will be subject to arithmetic overflow.  The stored value is not affected when this occurs.
      * @return The precision of the number
      */
     public long getPrecision(){

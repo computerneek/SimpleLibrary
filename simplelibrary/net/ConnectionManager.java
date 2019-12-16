@@ -18,17 +18,13 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.InterfaceAddress;
 import java.net.MulticastSocket;
-import java.net.NetworkInterface;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
-import java.util.Enumeration;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -731,6 +727,13 @@ public class ConnectionManager implements AutoCloseable{
                                         if(invalids>2){
                                             revalidateDatastream();
                                         }
+                                    }catch(RuntimeException ex){
+                                        if(ex.getCause()!=null&&ex.getCause() instanceof SocketException){
+                                            throw ex;
+                                        }
+                                    }catch(SocketException ex){
+                                        throw ex;
+                                    }catch(Exception ex){
                                     }
                                 }
                             }catch(IOException ex){
@@ -768,7 +771,6 @@ public class ConnectionManager implements AutoCloseable{
                             flushable = true;
                             while((socket!=null&&!socket.isClosed())||((type&(TYPE_FILE_IN|TYPE_FILE_OUT))>0&&!isClosed)){
                                 if(datastreamInvalid){
-                                    
                                     try{
                                         for(int i = 0; i<32; i++) out.write(0);
                                         out.write(1);
@@ -886,7 +888,7 @@ public class ConnectionManager implements AutoCloseable{
             fileOutputStreamsForRecievedFiles.remove(packet.tag.substring(14));
             receivedFiles.add(file);
         }
-        inboundPackets.enqueue(new PacketFileTransmission(packet.tag.substring(14), file.getAbsolutePath(), packet.packetNumber, packet.totalPacketCount));
+        inboundPackets.enqueue(new PacketFileTransmission(packet.tag.substring(14).split("\\|", 2)[1], file.getAbsolutePath(), packet.packetNumber, packet.totalPacketCount));
     }
     private String getFilepath(PacketData packet) {
         String name = Sys.splitString(packet.tag, '|')[2];

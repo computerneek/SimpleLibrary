@@ -79,11 +79,14 @@ public abstract class Menu extends Renderer2D{
             }
             component.isSelected = selected==component;
         }
-        if(selected!=null&&wheelChange!=0){
-            selected.mouseWheelChange(wheelChange);
+        if(wheelChange!=0){
+            if(selected==null||!selected.mouseWheelChange(wheelChange)) mouseWheelChange(wheelChange);
         }
     }
-    public void mouseWheelChange(int wheelChange){}
+    /**
+     * @return Whether the event should be consumed (as in, something happened)
+     */
+    public boolean mouseWheelChange(int wheelChange){return false;}
     public void onGUIOpened(){}
     public void onGUIClosed(){}
     public void persistMouseEvent(int button, boolean pressed, float x, float y) {

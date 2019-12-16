@@ -3,6 +3,7 @@ import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -19,7 +20,7 @@ public class Song{
     private int overallSongLength = -1;//In buffers
     private int totalSongLength = -1;//In milliseconds
     private final ArrayList<String> buffers = new ArrayList<>();
-    private final ArrayList<SoundChannel> channels = new ArrayList<>();
+    private final HashSet<SoundChannel> channels = new HashSet<>();
     private final String path;
     private final int channelCount;
     private final int sampleSize;
@@ -56,6 +57,7 @@ public class Song{
     }
     private static InputStream getSoundInputStream(String filepath) throws IOException{
         BufferedInputStream in = new BufferedInputStream(TexturePackManager.instance.currentTexturePack.getResourceAsStream(filepath));
+        in.mark(0);
         try{
             return AudioSystem.getAudioInputStream(in);
         }catch(Exception ex){
