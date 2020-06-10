@@ -66,8 +66,8 @@ public class ConfigList extends ConfigBase{
                 out.write(base.getIndex());
                 base.write(out);
             }
+            out.write(0);
         }
-        out.write(0);
     }
     @Override
     ConfigList getData() {

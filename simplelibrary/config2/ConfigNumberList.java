@@ -267,4 +267,14 @@ public class ConfigNumberList extends ConfigBase{
             add(number);
         }
     }
+    @Override
+    public boolean equals(Object obj) {
+        if(obj==null||obj.getClass()!=getClass()) return false;
+        ConfigNumberList l = (ConfigNumberList) obj;
+        if(l.lst.size()!=lst.size()) return false;
+        for(int i = 0; i<lst.size(); i++){
+            if(lst.get(i).longValue()!=l.lst.get(i).longValue()) return false;
+        }
+        return true;
+    }
 }

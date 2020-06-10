@@ -60,6 +60,7 @@ public class Sys{
         error(level, message, error, category, log);
     }
     public static void error(ErrorLevel level, String message, Throwable error, ErrorCategory category, boolean log){
+        if(!initialized) throw new RuntimeException(error);
         if(level==null&&error!=null){
             level = ErrorLevel.minor;
         }else if(level==null){
@@ -322,6 +323,7 @@ public class Sys{
      * @param error The error to log.  Cannot be null.
      */
     public static synchronized void log(String message, Throwable error){
+        if(!initialized) return;
         try (PrintWriter out=getErrorLog()) {
             out.println(message);
             if(error!=null){

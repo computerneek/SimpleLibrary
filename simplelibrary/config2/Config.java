@@ -365,4 +365,15 @@ public class Config extends ConfigBase implements Cloneable{
         }
         return c;
     }
+    @Override
+    public boolean equals(Object obj){
+        if(obj==null||obj.getClass()!=getClass()) return false;
+        Config c = (Config)obj;
+        if(c.keys.size()!=keys.size()) return false;
+        for(String k : keys){
+            if(!c.keys.contains(k)) return false;
+            if(!get(k).equals(c.get(k))) return false;
+        }
+        return true;
+    }
 }
