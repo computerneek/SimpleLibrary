@@ -1,4 +1,5 @@
 package simplelibrary.opengl.gui.components;
+import java.awt.Color;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.ArrayList;
@@ -70,9 +71,9 @@ public class MenuComponentButton extends MenuComponent implements ActionListener
             }
         }
         drawRect(x, y, x+width, y+height, texture);
-        GL11.glColor3f(0, 0, 0);
+        GL11.glColor3f(foregroundColor.getRed()/255F, foregroundColor.getGreen()/255F, foregroundColor.getBlue()/255F);
         drawCenteredText(x+textInset, y+textInset, x+width-textInset, y+height-textInset, label);
-        GL11.glColor3f(1, 1, 1);
+        GL11.glColor3f(color.getRed()/255F, color.getGreen()/255F, color.getBlue()/255F);
     }
     @Override
     public void mouseover(double x, double y, boolean isMouseOver){
@@ -81,10 +82,8 @@ public class MenuComponentButton extends MenuComponent implements ActionListener
             isPressed = false;
         }
     }
-    @Override
-    public void mouseDragged(double x, double y, int button){}
     /**
-     * Called when the button is clicked.  The default implementation defers the event to Menu.buttonClicked(MenuComponentButton).
+     * Called when the button is clicked.  The default implementation points to Menu.buttonClicked(MenuComponentButton), unless an ActionListener is present.
      */
     public void action(){
         if(listeners.isEmpty()) parent.buttonClicked(this);
@@ -100,5 +99,9 @@ public class MenuComponentButton extends MenuComponent implements ActionListener
         for(ActionListener l : listeners){
             gui.addPendingAction(l, e);
         }
+    }
+    @Override
+    protected Color defaultForegroundColor(){
+        return Color.BLACK;
     }
 }

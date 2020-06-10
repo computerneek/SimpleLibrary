@@ -25,6 +25,13 @@ public class Config extends ConfigBase implements Cloneable{
     private InputStream stream;
     private final ArrayList<String> keys = new ArrayList<>();
     private final HashMap<String, ConfigBase> data = new HashMap<>();
+    /**
+     * The format version that this Config2 system will write.
+     * Any Config2 file, of this version or lower, can be parsed successfully.  However,
+     * ALL save operations will produce a file of this specific version.
+     * The original Config2 format, written by all versions of SimpleLibrary before the introduction of this field, is format version 0.
+     */
+    public static final short CONFIG_VERSION = 1;
     public static Config newConfig(File file){
         Config config = new Config();
         config.type = TYPE_FILE;
@@ -48,24 +55,33 @@ public class Config extends ConfigBase implements Cloneable{
     }
     public Config(){}
     @Override
-    void read(DataInputStream in) throws IOException{
-        setName(in.readUTF());
+    void read(DataInputStream in, short version) throws IOException{
         int index;
         ConfigBase base;
+        if(version==0){//Version 0 compatability
+            String key;
+            while((index = in.read())>0){
+                base = newConfig(index);
+                key = in.readUTF();
+                base.read(in, version);
+                dataput(key, base);
+            }
+            return;
+        }
         while((index = in.read())>0){
             base = newConfig(index);
-            base.read(in);
-            dataput(base.getName(), base);
+            base.read(in, version);
+            dataput(in.readUTF(), base);
         }
     }
     @Override
     void write(DataOutputStream out) throws IOException{
-        out.writeUTF(getName());
         ConfigBase base;
         for(String str : keys){
             base = data.get(str);
             out.write(base.getIndex());
             base.write(out);
+            out.writeUTF(str);//Save key AFTER the data, because that's how it's being read
         }
         out.write(0);
     }
@@ -113,6 +129,7 @@ public class Config extends ConfigBase implements Cloneable{
         }
     }
     public boolean save(File file){
+        file = file.getAbsoluteFile();
         try{
             file.getParentFile().mkdirs();
             if(!file.getParentFile().exists()||!file.getParentFile().isDirectory()||file.isDirectory()){
@@ -173,7 +190,9 @@ public class Config extends ConfigBase implements Cloneable{
         keys.clear();
         DataInputStream dataIn = new DataInputStream(in);
         try{
-            read(dataIn);
+            short version = dataIn.readShort();
+            if(version>CONFIG_VERSION) throw new IllegalArgumentException("File is a newer version of format!");
+            read(dataIn, version);
         }catch(Throwable ex){
             Sys.error(ErrorLevel.moderate, "Could not load config!", ex, ErrorCategory.config);
             return null;
@@ -186,6 +205,7 @@ public class Config extends ConfigBase implements Cloneable{
         }
         DataOutputStream dataOut = new DataOutputStream(out);
         try{
+            dataOut.writeShort(CONFIG_VERSION);
             write(dataOut);
         }catch(Throwable ex){
             Sys.error(ErrorLevel.moderate, "Could not save config!", ex, ErrorCategory.config);
@@ -221,62 +241,76 @@ public class Config extends ConfigBase implements Cloneable{
         return data.containsKey(key);
     }
     public void setProperty(String key, Config value){
-        value.setName(key);
         dataput(key, value);
     }
     public void setProperty(String key, String value){
-        dataput(key, new ConfigString(key, value));
+        dataput(key, new ConfigString(value));
     }
     public void setProperty(String key, int value){
-        dataput(key, new ConfigInteger(key, value));
+        dataput(key, new ConfigInteger(value));
     }
     public void setProperty(String key, boolean value){
-        dataput(key, new ConfigBoolean(key, value));
+        dataput(key, new ConfigBoolean(value));
     }
     public void setProperty(String key, float value){
-        dataput(key, new ConfigFloat(key, value));
+        dataput(key, new ConfigFloat(value));
     }
     public void setProperty(String key, long value){
-        dataput(key, new ConfigLong(key, value));
+        dataput(key, new ConfigLong(value));
     }
     public void setProperty(String key, double value){
-        dataput(key, new ConfigDouble(key, value));
+        dataput(key, new ConfigDouble(value));
+    }
+    public void setProperty(String key, byte value){
+        dataput(key, new ConfigByte(value));
+    }
+    public void setProperty(String key, short value){
+        dataput(key, new ConfigShort(value));
+    }
+    public void setProperty(String key, ConfigNumberList value){
+        dataput(key, value);
     }
     public void setProperty(String key, HugeLong value){
-        dataput(key, new ConfigHugeLong(key, value));
+        dataput(key, new ConfigHugeLong(value));
     }
     public void setProperty(String key, ConfigList value){
-        value.setName(key);
         dataput(key, value);
     }
     public void set(String key, Config value){
-        value.setName(key);
         dataput(key, value);
     }
     public void set(String key, String value){
-        dataput(key, new ConfigString(key, value));
+        dataput(key, new ConfigString(value));
     }
     public void set(String key, int value){
-        dataput(key, new ConfigInteger(key, value));
+        dataput(key, new ConfigInteger(value));
     }
     public void set(String key, boolean value){
-        dataput(key, new ConfigBoolean(key, value));
+        dataput(key, new ConfigBoolean(value));
     }
     public void set(String key, float value){
-        dataput(key, new ConfigFloat(key, value));
+        dataput(key, new ConfigFloat(value));
     }
     public void set(String key, long value){
-        dataput(key, new ConfigLong(key, value));
+        dataput(key, new ConfigLong(value));
     }
     public void set(String key, double value){
-        dataput(key, new ConfigDouble(key, value));
+        dataput(key, new ConfigDouble(value));
     }
     public void set(String key, HugeLong value){
-        dataput(key, new ConfigHugeLong(key, value));
+        dataput(key, new ConfigHugeLong(value));
     }
     public void set(String key, ConfigList value){
-        value.setName(key);
         dataput(key, value);
+    }
+    public void set(String key, ConfigNumberList value){
+        dataput(key, value);
+    }
+    public void set(String key, byte value){
+        dataput(key, new ConfigByte(value));
+    }
+    public void set(String key, short value){
+        dataput(key, new ConfigShort(value));
     }
     public void set(String key, Object value){
         if(value==null){
@@ -298,6 +332,12 @@ public class Config extends ConfigBase implements Cloneable{
             set(key, (HugeLong)value);
         }else if(value instanceof ConfigList){
             set(key, (ConfigList)value);
+        }else if(value instanceof ConfigNumberList){
+            set(key, (ConfigNumberList)value);
+        }else if(value instanceof Byte){
+            set(key, (byte)value);
+        }else if(value instanceof Short){
+            set(key, (short)value);
         }
     }
     private void dataput(String key, ConfigBase base){

@@ -5,8 +5,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.List;
-import java.util.ListIterator;
 import simplelibrary.numbers.HugeLong;
 public class ConfigList extends ConfigBase{
     private ArrayList<ConfigBase> lst = new ArrayList<>();
@@ -17,22 +15,57 @@ public class ConfigList extends ConfigBase{
         }
     }
     @Override
-    void read(DataInputStream in) throws IOException {
-        setName(in.readUTF());
-        int index;
-        ConfigBase base;
-        while((index = in.read())>0){
-            base = newConfig(index);
-            base.read(in);
-            lst.add(base);
+    void read(DataInputStream in, short version) throws IOException{
+        int oneType = version==0?2:in.read();//Version 0 is before the One Type system was implemented- disable it.
+        if(oneType==0) return;//Empty list
+        if(oneType==1){
+            int count = in.readInt();
+            int index = in.read();
+            ConfigBase base;
+            for(int i=0; i<count; i++){
+                base = newConfig(index);
+                base.read(in, version);
+                lst.add(base);
+            }
+        }else{
+            int index;
+            ConfigBase base;
+            while((index = in.read())>0){
+                base = newConfig(index);
+                if(version==0) in.readShort();//This is a UTF-8 empty string, 0x0000, the "name" of the objects in the list.  Removed as extraneous in Version 1.
+                base.read(in, version);
+                lst.add(base);
+            }
         }
     }
     @Override
     void write(DataOutputStream out) throws IOException {
-        out.writeUTF(getName());
-        for(ConfigBase base : lst){
-            out.write(base.getIndex());
-            base.write(out);
+        if(lst.isEmpty()){
+            out.write(0);
+            return;
+        }
+        boolean oneType = lst.size()>4;
+        if(oneType){
+            ConfigBase ref = lst.get(0);
+            for(ConfigBase b : lst){
+                if(b.getClass()!=ref.getClass()){
+                    oneType = false;
+                    break;
+                }
+            }
+        }
+        out.write(oneType?1:2);
+        if(oneType){
+            out.writeInt(lst.size());
+            out.write(lst.get(0).getIndex());
+            for(ConfigBase b : lst){
+                b.write(out);
+            }
+        }else{
+            for(ConfigBase base : lst){
+                out.write(base.getIndex());
+                base.write(out);
+            }
         }
         out.write(0);
     }
@@ -99,25 +132,25 @@ public class ConfigList extends ConfigBase{
         doAdd(value);
     }
     public void add(String value){
-        doAdd(new ConfigString("", value));
+        doAdd(new ConfigString(value));
     }
     public void add(int value){
-        doAdd(new ConfigInteger("", value));
+        doAdd(new ConfigInteger(value));
     }
     public void add(boolean value){
-        doAdd(new ConfigBoolean("", value));
+        doAdd(new ConfigBoolean(value));
     }
     public void add(float value){
-        doAdd(new ConfigFloat("", value));
+        doAdd(new ConfigFloat(value));
     }
     public void add(long value){
-        doAdd(new ConfigLong("", value));
+        doAdd(new ConfigLong(value));
     }
     public void add(double value){
-        doAdd(new ConfigDouble("", value));
+        doAdd(new ConfigDouble(value));
     }
     public void add(HugeLong value){
-        doAdd(new ConfigHugeLong("", value));
+        doAdd(new ConfigHugeLong(value));
     }
     public void add(ConfigList value){
         doAdd(value);

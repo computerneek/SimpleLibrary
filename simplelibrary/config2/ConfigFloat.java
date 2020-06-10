@@ -6,19 +6,18 @@ import java.util.logging.Logger;
 class ConfigFloat extends ConfigBase{
     private static final Logger LOG = Logger.getLogger(ConfigFloat.class.getName());
     private float data;
-    ConfigFloat(String key, float value){
-        setName(key);
+    ConfigFloat(float value){
         data = value;
     }
     ConfigFloat(){}
     @Override
-    void read(DataInputStream in) throws IOException{
-        setName(in.readUTF());
+    void read(DataInputStream in, short version) throws IOException{
+        //Version 0:  Read/write key.  Handled outside, ignore.
+        //Version 1:  Current
         data = in.readFloat();
     }
     @Override
     void write(DataOutputStream out) throws IOException{
-        out.writeUTF(getName());
         out.writeFloat(data);
     }
     @Override

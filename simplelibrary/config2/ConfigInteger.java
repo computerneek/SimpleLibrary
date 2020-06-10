@@ -6,19 +6,18 @@ import java.util.logging.Logger;
 class ConfigInteger extends ConfigBase{
     private static final Logger LOG = Logger.getLogger(ConfigInteger.class.getName());
     private int data;
-    ConfigInteger(String key, int value){
-        setName(key);
+    ConfigInteger(int value){
         data = value;
     }
     ConfigInteger(){}
     @Override
-    void read(DataInputStream in) throws IOException{
-        setName(in.readUTF());
+    void read(DataInputStream in, short version) throws IOException{
+        //Version 0:  Read/write key.  Handled outside, ignore.
+        //Version 1:  Current
         data = in.readInt();
     }
     @Override
     void write(DataOutputStream out) throws IOException{
-        out.writeUTF(getName());
         out.writeInt(data);
     }
     @Override

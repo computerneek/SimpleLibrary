@@ -21,14 +21,14 @@ class ConfigHugeLong extends ConfigBase{
             throw new RuntimeException(ex);
         }
     }
-    ConfigHugeLong(String key, HugeLong value){
-        setName(key);
+    ConfigHugeLong(HugeLong value){
         data = value;
     }
     ConfigHugeLong(){}
     @Override
-    void read(DataInputStream in) throws IOException{
-        setName(in.readUTF());
+    void read(DataInputStream in, short version) throws IOException{
+        //Version 0:  Read/write key.  Handled outside, ignore.
+        //Version 1:  Current
         data = baseInstance.copy();
         boolean[] da;
         try{
@@ -46,7 +46,6 @@ class ConfigHugeLong extends ConfigBase{
     }
     @Override
     void write(DataOutputStream out) throws IOException{
-        out.writeUTF(getName());
         boolean[] da;
         try{
             da = (boolean[])field.get(data);

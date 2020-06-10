@@ -3,7 +3,6 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 abstract class ConfigBase{
-    private String name = "";
     protected ConfigBase(){}
     protected ConfigBase newConfig(int index){
         switch(index){
@@ -25,18 +24,18 @@ abstract class ConfigBase{
                 return new ConfigHugeLong();
             case 9:
                 return new ConfigList();
+            case 10:
+                return new ConfigByte();
+            case 11:
+                return new ConfigShort();
+            case 12:
+                return new ConfigNumberList();
             default:
                 throw new AssertionError(index);
         }
     }
-    abstract void read(DataInputStream in) throws IOException;
+    abstract void read(DataInputStream in, short version) throws IOException;
     abstract void write(DataOutputStream out) throws IOException;
-    void setName(String name){
-        this.name = name;
-    }
-    public String getName(){
-        return name;
-    }
     int getIndex(){
         Class<? extends ConfigBase> clazz = getClass();
         if(clazz==Config.class){
@@ -57,6 +56,12 @@ abstract class ConfigBase{
             return 8;
         }else if(clazz==ConfigList.class){
             return 9;
+        }else if(clazz==ConfigByte.class){
+            return 10;
+        }else if(clazz==ConfigShort.class){
+            return 11;
+        }else if(clazz==ConfigNumberList.class){
+            return 12;
         }else{
             throw new AssertionError(clazz.getName());
         }

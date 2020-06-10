@@ -17,6 +17,10 @@ public abstract class MenuComponent extends Menu{
      */
     public Color color=Color.WHITE;
     /**
+     * The color of foreground components.
+     */
+    public Color foregroundColor = defaultForegroundColor();
+    /**
      * The height of the component, in GL coordinates
      */
     public double height;
@@ -125,6 +129,10 @@ public abstract class MenuComponent extends Menu{
         this.color = color;
         return this;
     }
+    public MenuComponent setForegroundColor(Color color){
+        this.foregroundColor = color;
+        return this;
+    }
     public void setLocation(Point p) {
         x = p.x;
         y = p.y;
@@ -228,4 +236,7 @@ public abstract class MenuComponent extends Menu{
     public void renderBackground() {}
     @Override
     public void renderForeground(){}
+    protected Color defaultForegroundColor(){
+        return Color.WHITE;
+    }
 }

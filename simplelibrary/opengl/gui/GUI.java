@@ -6,7 +6,6 @@ import java.util.logging.Logger;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.Display;
-import org.lwjgl.opengl.GL11;
 import simplelibrary.Queue;
 import simplelibrary.Sys;
 import simplelibrary.error.ErrorCategory;
@@ -124,10 +123,7 @@ public class GUI{
                         y--;
                         break;
                 }
-                if(helper!=null&&GameHelper.MODE_3D!=type){
-                    x/=helper.guiScale;
-                    y/=helper.guiScale;
-                }else if(helper!=null){
+                if(helper!=null){
                     x*=helper.guiScale;
                     y*=helper.guiScale;
                 }
@@ -182,10 +178,10 @@ public class GUI{
         return theException;
     }
     protected void persistMouseEvent(int button, boolean pressed, float x, float y){
-        menu.persistMouseEvent(button, pressed, x, y);
+        if(menu!=null)menu.persistMouseEvent(button, pressed, x, y);
     }
     protected void mouseEvent(int button, boolean pressed, float x, float y, int xChange, int yChange, int wheelChange){
-        menu.mouseEvent(button, pressed, x, y, xChange, yChange, wheelChange);
+        if(menu!=null)menu.mouseEvent(button, pressed, x, y, xChange, yChange, wheelChange);
     }
     private Exception processKeyboard(Exception theException){
         while(Keyboard.next()){
@@ -212,7 +208,7 @@ public class GUI{
         return theException;
     }
     protected void keyboardEvent(char character, int key, boolean pressed, boolean isRepeat){
-        menu.keyboardEvent(character, key, pressed, isRepeat);
+        if(menu!=null)menu.keyboardEvent(character, key, pressed, isRepeat);
     }
     /**
      * Increments the <code>tick</code> variable and ticks the menu

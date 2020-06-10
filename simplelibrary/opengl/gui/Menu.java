@@ -1,4 +1,6 @@
 package simplelibrary.opengl.gui;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import org.lwjgl.opengl.Display;
 import simplelibrary.game.GameHelper;
@@ -8,10 +10,18 @@ import simplelibrary.opengl.gui.components.ListComponentButton;
 import simplelibrary.opengl.gui.components.MenuComponent;
 import simplelibrary.opengl.gui.components.MenuComponentButton;
 public abstract class Menu extends Renderer2D{
+    private static boolean hasBackgroundTexture;
     public Menu parent;
     public ArrayList<MenuComponent> components = new ArrayList<>();
     public MenuComponent selected;
     public GUI gui;
+    private static final String menuBackground = "/gui/menuBackground.png";
+    static{
+        try(InputStream in = Menu.class.getResourceAsStream(menuBackground)){
+            if(in!=null) hasBackgroundTexture = true;
+        }catch(IOException ex){
+        }
+    }
     public Menu(GUI gui, Menu parent){
         this.gui = gui;
         this.parent = parent;
@@ -34,16 +44,17 @@ public abstract class Menu extends Renderer2D{
         renderForeground();
     }
     public void renderBackground(){
+        if(!hasBackgroundTexture) return;
         switch(gui.type){
             case GameHelper.MODE_2D:
             case GameHelper.MODE_HYBRID:
-                drawRect(0, 0, Display.getWidth(), Display.getHeight(), ImageStash.instance.getTexture("/gui/menuBackground.png"));
+                drawRect(0, 0, Display.getWidth(), Display.getHeight(), ImageStash.instance.getTexture(menuBackground));
                 break;
             case GameHelper.MODE_2D_CENTERED:
-                drawRect(-Display.getWidth()/2, -Display.getHeight()/2, Display.getWidth()/2, Display.getHeight()/2, ImageStash.instance.getTexture("/gui/menuBackground.png"));
+                drawRect(-Display.getWidth()/2, -Display.getHeight()/2, Display.getWidth()/2, Display.getHeight()/2, ImageStash.instance.getTexture(menuBackground));
                 break;
             case GameHelper.MODE_3D:
-                drawRect(-Display.getWidth()/Display.getHeight(), -1, Display.getWidth()/Display.getHeight(), 1, ImageStash.instance.getTexture("/gui/menuBackground.png"));
+                drawRect(-Display.getWidth()/Display.getHeight(), -1, Display.getWidth()/Display.getHeight(), 1, ImageStash.instance.getTexture(menuBackground));
                 break;
             default:
                 throw new AssertionError(gui.type);
@@ -63,14 +74,15 @@ public abstract class Menu extends Renderer2D{
         if(selected!=null){
             selected.keyboardEvent(character, key, pressed, repeat);
         }
+        else{
+            processKeyboard(character, key, pressed, repeat);
+        }
     }
     public void processKeyboard(char character, int key, boolean pressed, boolean repeat){}
     public void mouseEvent(int button, boolean pressed, float x, float y, float xChange, float yChange, int wheelChange){
-        boolean found = false;
         for(MenuComponent component : components){
             if(isClickWithinBounds(x, y, component.x, component.y, component.x+component.width, component.y+component.height)){
                 component.mouseEvent(button, pressed, x-(float)component.x, y-(float)component.y, xChange, yChange, wheelChange);
-                found = true;
                 if(button>=0&&button<3&&gui.mouseWereDown.contains(button)!=pressed){
                     selected = component;
                 }

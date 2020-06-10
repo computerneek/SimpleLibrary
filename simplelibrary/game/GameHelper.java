@@ -85,6 +85,7 @@ public class GameHelper extends Thread{
     private boolean depthTestEnabledBeforeFramebuffer;
     private boolean wasLightingEnabledBeforeFramebuffer;
     private boolean wasDepthTestEnabledBeforeFramebuffer;
+    private Object timer = new Object();//Synchronization object to prevent data races in render loop timing
     //</editor-fold>
     public void setMaximumFramerate(int maxFramerate){
         framerateCap = maxFramerate;
@@ -226,7 +227,9 @@ public class GameHelper extends Thread{
 //                }
 //            });
         callFunction("TickInit", tickInitMethod, tickInitObject, new Object[0]);
-        tickTime = getTime();
+        synchronized(timer){
+            tickTime = getTime();
+        }
         synchronized(this){
             kickoffRenderThread();
             try {
@@ -235,7 +238,9 @@ public class GameHelper extends Thread{
         }
         callFunction("FinalInit", finalInitMethod, finalInitObject, new Object[0]);
         while(running){
-            tickTime = getTime();
+            synchronized(timer){
+                tickTime = getTime();
+            }
             callFunction("Tick", tickMethod, tickObject, false);
             Display.sync(tickRate);
         }
@@ -373,7 +378,11 @@ public class GameHelper extends Thread{
         }
         GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT | GL11.GL_STENCIL_BUFFER_BIT);
         GL11.glLoadIdentity();
-        Object value = callFunction("Render", renderMethod, renderObject, (int)(getTime()-tickTime));
+        int tTime;
+        synchronized(timer){
+            tTime = (int)(getTime()-tickTime);
+        }
+        Object value = callFunction("Render", renderMethod, renderObject, tTime);
         if(value!=null&&value instanceof Boolean&&(boolean)value){
             return;
         }
