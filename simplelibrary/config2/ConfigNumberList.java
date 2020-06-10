@@ -19,15 +19,15 @@ public class ConfigNumberList extends ConfigBase{
     ConfigNumberList getData(){
         return this;
     }
-    public <V extends Number> V get(int index){
-        if(index>=size()||index<0) return (V)(Number)0;
-        else return (V)lst.get(index);
+    public long get(int index){
+        if(index>=size()||index<0) return 0;
+        else return (long) lst.get(index);
     }
     public int size(){
         return lst.size();
     }
-    public <V extends Number> V remove(int index){
-        V val = get(index);
+    public long remove(int index){
+        long val = get(index);
         if(index>=0&&index<size()) lst.remove(index);
         return val;
     }
