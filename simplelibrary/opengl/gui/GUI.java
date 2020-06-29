@@ -76,6 +76,9 @@ public class GUI{
             throw new IllegalArgumentException("The most recent tick can't be in the future!");
         }
         Exception theException = null;
+        theException=processKeyboard(theException);
+        theException=processMouse(theException);
+        doActions();
         if(type==GameHelper.MODE_3D||type==GameHelper.MODE_HYBRID){
             helper.make2D();
         }
@@ -89,12 +92,9 @@ public class GUI{
         if(type==GameHelper.MODE_3D||type==GameHelper.MODE_HYBRID){
             helper.make3D();
         }
-        theException=processKeyboard(theException);
-        theException=processMouse(theException);
         if(theException!=null){
             throw new RuntimeException(theException);
         }
-        doActions();
     }
     private Exception processMouse(Exception theException){
         boolean needsStatic = !mouseWereDown.isEmpty();

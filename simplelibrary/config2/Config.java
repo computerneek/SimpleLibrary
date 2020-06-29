@@ -13,7 +13,6 @@ import java.util.HashMap;
 import simplelibrary.Sys;
 import simplelibrary.error.ErrorCategory;
 import simplelibrary.error.ErrorLevel;
-import simplelibrary.numbers.HugeLong;
 public class Config extends ConfigBase implements Cloneable{
     private static final int TYPE_ALONE = 1;
     private static final int TYPE_FILE = 2;
@@ -30,6 +29,7 @@ public class Config extends ConfigBase implements Cloneable{
      * Any Config2 file, of this version or lower, can be parsed successfully.  However,
      * ALL save operations will produce a file of this specific version.
      * The original Config2 format, written by all versions of SimpleLibrary before the introduction of this field, is format version 0.
+     * NOTE:  Version 2 is exclusive to ConfigMulti.
      */
     public static final short CONFIG_VERSION = 1;
     public static Config newConfig(File file){
@@ -189,11 +189,21 @@ public class Config extends ConfigBase implements Cloneable{
         data.clear();
         keys.clear();
         DataInputStream dataIn = new DataInputStream(in);
+        boolean fail = false;
         try{
             short version = dataIn.readShort();
-            if(version>CONFIG_VERSION) throw new IllegalArgumentException("File is a newer version of format!");
+            if(version==2){
+                //Version 2 is exclusive to ConfigMulti
+                fail = true;
+                throw new IllegalArgumentException("File is not a Config file!  Open it with ConfigMulti!");
+            }
+            if(version>CONFIG_VERSION){
+                fail = true;
+                throw new IllegalArgumentException("File is a newer version of format!");
+            }
             read(dataIn, version);
         }catch(Throwable ex){
+            if(ex instanceof IllegalArgumentException&&((IllegalArgumentException)ex).getMessage().equals("File is a newer version of format!")) throw (IllegalArgumentException)ex;
             Sys.error(ErrorLevel.moderate, "Could not load config!", ex, ErrorCategory.config);
             return null;
         }
@@ -270,9 +280,6 @@ public class Config extends ConfigBase implements Cloneable{
     public void setProperty(String key, ConfigNumberList value){
         dataput(key, value);
     }
-    public void setProperty(String key, HugeLong value){
-        dataput(key, new ConfigHugeLong(value));
-    }
     public void setProperty(String key, ConfigList value){
         dataput(key, value);
     }
@@ -296,9 +303,6 @@ public class Config extends ConfigBase implements Cloneable{
     }
     public void set(String key, double value){
         dataput(key, new ConfigDouble(value));
-    }
-    public void set(String key, HugeLong value){
-        dataput(key, new ConfigHugeLong(value));
     }
     public void set(String key, ConfigList value){
         dataput(key, value);
@@ -328,8 +332,6 @@ public class Config extends ConfigBase implements Cloneable{
             set(key, (long)value);
         }else if(value instanceof Double){
             set(key, (double)value);
-        }else if(value instanceof HugeLong){
-            set(key, (HugeLong)value);
         }else if(value instanceof ConfigList){
             set(key, (ConfigList)value);
         }else if(value instanceof ConfigNumberList){
@@ -359,6 +361,7 @@ public class Config extends ConfigBase implements Cloneable{
             ConfigBase b = data.get(s);
             if(b instanceof Config){
                 c.data.put(s, ((Config)b).clone());
+                //TODO make ConfigList and ConfigNumberList deep-clone as well
             }else{
                 c.data.put(s, b);
             }

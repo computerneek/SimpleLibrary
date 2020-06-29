@@ -20,8 +20,8 @@ abstract class ConfigBase{
                 return new ConfigLong();
             case 7:
                 return new ConfigDouble();
-            case 8:
-                return new ConfigHugeLong();
+            case 8://Old ConfigHugeLong type, removed
+                throw new UnsupportedOperationException("The HugeLong type was removed!  Use SimpleLibrary version 10.2.1 or earlier to read this file.");
             case 9:
                 return new ConfigList();
             case 10:
@@ -52,8 +52,6 @@ abstract class ConfigBase{
             return 6;
         }else if(clazz==ConfigDouble.class){
             return 7;
-        }else if(clazz==ConfigHugeLong.class){
-            return 8;
         }else if(clazz==ConfigList.class){
             return 9;
         }else if(clazz==ConfigByte.class){

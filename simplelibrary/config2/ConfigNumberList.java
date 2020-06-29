@@ -3,10 +3,8 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
-import simplelibrary.numbers.HugeLong;
 public class ConfigNumberList extends ConfigBase{
     private ArrayList<Number> lst = new ArrayList<>();
     public ConfigNumberList(){}

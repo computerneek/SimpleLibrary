@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
-import simplelibrary.numbers.HugeLong;
 public class ConfigList extends ConfigBase{
     private ArrayList<ConfigBase> lst = new ArrayList<>();
     public ConfigList(){}
@@ -149,9 +148,6 @@ public class ConfigList extends ConfigBase{
     public void add(double value){
         doAdd(new ConfigDouble(value));
     }
-    public void add(HugeLong value){
-        doAdd(new ConfigHugeLong(value));
-    }
     public void add(ConfigList value){
         doAdd(value);
     }
@@ -171,8 +167,6 @@ public class ConfigList extends ConfigBase{
             add((long)value);
         }else if(value instanceof Double){
             add((double)value);
-        }else if(value instanceof HugeLong){
-            add((HugeLong)value);
         }else if(value instanceof ConfigList){
             add((ConfigList)value);
         }

@@ -13,6 +13,7 @@ import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.PixelFormat;
 import org.lwjgl.util.glu.GLU;
 import simplelibrary.Sys;
 import simplelibrary.error.ErrorCategory;
@@ -86,6 +87,7 @@ public class GameHelper extends Thread{
     private boolean wasLightingEnabledBeforeFramebuffer;
     private boolean wasDepthTestEnabledBeforeFramebuffer;
     private Object timer = new Object();//Synchronization object to prevent data races in render loop timing
+    private int multisampleCount;
     //</editor-fold>
     public void setMaximumFramerate(int maxFramerate){
         framerateCap = maxFramerate;
@@ -188,6 +190,9 @@ public class GameHelper extends Thread{
     public void setTickRate(int tickRate){
         this.tickRate = tickRate;
     }
+    public void setAntiAliasing(int multisampleCount){
+        this.multisampleCount = multisampleCount;
+    }
     @Override
     public void start(){
         if(tickInitMethod==null&&renderInitMethod==null&&finalInitMethod==null){
@@ -277,7 +282,7 @@ public class GameHelper extends Thread{
         renderThread.setName("GameHelper Render Thread");
         renderThread.start();
     }
-    public void createDisplay(){
+    private void createDisplay(){
         try{
             if(canvas==null||!canvas.isVisible()){
                 frame = WindowHelper.createFrameWithoutAppearance(windowTitle, width, height, null);
@@ -293,13 +298,13 @@ public class GameHelper extends Thread{
                 background = Color.BLACK;
             }
             Display.setVSyncEnabled(true);
-            Display.create();
+            Display.create(new PixelFormat(0, 8, 8, multisampleCount));
             hasColorChanged = true;
         }catch(LWJGLException ex){
             Sys.error(ErrorLevel.severe, "Could not create display!", ex, ErrorCategory.bug);
         }
     }
-    public void setupControllers(){
+    private void setupControllers(){
         if(!usesControllers&&!usesMouse&&!usesKeyboard){
             Sys.error(ErrorLevel.warning, "No input used!", null, ErrorCategory.bug);
         }
@@ -342,10 +347,10 @@ public class GameHelper extends Thread{
     public void setAutoExitFullscreen(boolean autoExit){
         autoExitFullscreen = autoExit;
     }
-    private long getTime(){
+    public long getTime(){
         return org.lwjgl.Sys.getTime()*1_000/org.lwjgl.Sys.getTimerResolution();
     }
-    public void render() throws LWJGLException{
+    private void render() throws LWJGLException{
         if(autoExitFullscreen&&fullscreen&&!Display.isActive()&&framesSinceFullscreen>5){
             fullscreen = false;
         }

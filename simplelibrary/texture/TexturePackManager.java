@@ -37,7 +37,7 @@ public class TexturePackManager{
     final TexturePack defaultTexturePack;
     /**
      * Creates a new texture pack manager.  It stores itself in the <code>instance</code> variable at the end of the constructor, so it is safe to ignore the new object.
-     * @param file The folder to search for new texture packs.  If it does not exist, it is created.
+     * @param file The folder to search for new texture packs.  If it does not exist, it is created.  If it is null, no external texture pack searching is done.
      * @param defaultTexturePack The default texture pack.  Null value may cause errors.
      */
     public TexturePackManager(File file, TexturePack defaultTexturePack){
