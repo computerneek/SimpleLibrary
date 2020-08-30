@@ -1,6 +1,6 @@
 package simplelibrary.opengl.gui.components;
 import java.util.logging.Logger;
-import org.lwjgl.input.Keyboard;
+import static org.lwjgl.glfw.GLFW.*;
 import org.lwjgl.opengl.GL11;
 import simplelibrary.game.GameHelper;
 import simplelibrary.opengl.ImageStash;
@@ -37,21 +37,21 @@ public class MenuComponentTextBox extends MenuComponent{
         this.editable = editable;
     }
     @Override
-    public void mouseEvent(double x, double y, int button, boolean isDown){}
+    public void onCharTyped(char c) {
+        if(!Character.isWhitespace(c)&&editable)text+=c;
+    }
     @Override
-    public void processKeyboard(char character, int key, boolean pressed, boolean repeat){
-        if(pressed==true&&editable){
-            if(key==Keyboard.KEY_BACK){
+    public void keyEvent(int key, int scancode, boolean isPress, boolean isRepeat, int modifiers) {
+        if(!(isPress||isRepeat)||!editable) return;//Don't care about release, or while editing is off
+        switch(key){
+            case GLFW_KEY_BACKSPACE:
                 if(!text.isEmpty()){
                     text = text.substring(0, text.length()-1);
-                }
-            }else if(key==Keyboard.KEY_TAB){
-                parent.onTabPressed(this);
-            }else if(key==Keyboard.KEY_RETURN){
-                parent.onReturnPressed(this);
-            }else if(character==' '||!(""+character).trim().isEmpty()){
-                text+=character;
-            }
+                } break;
+            case GLFW_KEY_TAB:
+                parent.onTabPressed(this); break;
+            case GLFW_KEY_ENTER:
+                parent.onReturnPressed(this); break;
         }
     }
     @Override

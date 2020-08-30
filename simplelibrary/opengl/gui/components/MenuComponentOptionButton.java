@@ -1,21 +1,22 @@
 package simplelibrary.opengl.gui.components;
 import java.util.logging.Logger;
-import org.lwjgl.input.Keyboard;
 import org.lwjgl.opengl.GL11;
 import simplelibrary.game.GameHelper;
 import simplelibrary.opengl.ImageStash;
 public class MenuComponentOptionButton extends MenuComponent{
     private static final Logger LOG = Logger.getLogger(MenuComponentOptionButton.class.getName());
-    private final String label;
+    public final String label;
     public boolean enabled;
     public int startingIndex;
-    private int currentIndex;
-    private final String[] options;
+    public int currentIndex;
+    public String[] options;
     private boolean isPressed;
     private boolean isRightPressed;
     public double textInset = -1;
     private boolean useMouseover = true;
     protected String textureRoot = "/gui/button";
+    public boolean actOnPress = DefaultActOnPress;
+    public static boolean DefaultActOnPress = false;
     public MenuComponentOptionButton(double x, double y, double width, double height, String label, boolean enabled, int startingOption, String... options){
         super(x, y, width, height);
         this.label = label;
@@ -36,33 +37,22 @@ public class MenuComponentOptionButton extends MenuComponent{
         return currentIndex!=startingIndex;
     }
     @Override
-    public void mouseEvent(double x, double y, int button, boolean isDown){
-        if(button==0&&isDown==true&&enabled){
+    public void onMouseButton(double x, double y, int button, boolean pressed, int mods) {
+        if(pressed&&enabled&&button==0){
             isPressed = true;
-        }else if(button==0&&isDown==false&&isPressed&&enabled){
+            if(actOnPress) action();
+        }else if(button==0&&!pressed){
+            if(!actOnPress&&isPressed&&!Double.isNaN(x)) action();
             isPressed = false;
-            action();
         }
-        if(button==1&&isDown==true&&enabled){
+        if(pressed&&enabled&&button==1){
             isRightPressed = true;
-        }else if(button==1&&isDown==false&&isRightPressed&&enabled){
+            if(actOnPress) reverseAction();
+        }else if(button==1&&!pressed){
+            if(!actOnPress&&isRightPressed&&!Double.isNaN(x)) reverseAction();
             isRightPressed = false;
-            reverseAction();
         }
-    }
-    @Override
-    public void processKeyboard(char character, int key, boolean pressed, boolean repeat){
-        if(pressed==true&&enabled){
-            if(key==Keyboard.KEY_TAB){
-                parent.onTabPressed(this);
-            }else if(key==Keyboard.KEY_RETURN){
-                parent.onReturnPressed(this);
-            }else if(key==Keyboard.KEY_SPACE||key==Keyboard.KEY_RIGHT){
-                action();
-            }else if(key==Keyboard.KEY_LEFT){
-                reverseAction();
-            }
-        }
+        super.onMouseButton(x, y, button, pressed, mods); //To change body of generated methods, choose Tools | Templates.
     }
     @Override
     public void render(){
@@ -101,16 +91,6 @@ public class MenuComponentOptionButton extends MenuComponent{
         drawCenteredText(x+textInset, y+textInset, x+width-textInset, y+height-textInset, label+": "+options[currentIndex]);
         GL11.glColor3f(1, 1, 1);
     }
-    @Override
-    public void mouseover(double x, double y, boolean isMouseOver){
-        super.mouseover(x, y, isMouseOver);
-        if(!isMouseOver){
-            isPressed = false;
-            isRightPressed = false;
-        }
-    }
-    @Override
-    public void mouseDragged(double x, double y, int button){}
     private void action(){
         currentIndex++;
         if(currentIndex>=options.length){

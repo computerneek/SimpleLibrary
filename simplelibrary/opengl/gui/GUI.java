@@ -3,9 +3,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.ArrayList;
 import java.util.logging.Logger;
-import org.lwjgl.input.Keyboard;
-import org.lwjgl.input.Mouse;
-import org.lwjgl.opengl.Display;
+import org.lwjgl.glfw.GLFW;
 import simplelibrary.Queue;
 import simplelibrary.Sys;
 import simplelibrary.error.ErrorCategory;
@@ -41,10 +39,8 @@ public class GUI{
      * The type of the GUI.  See <code>GameHelper.TYPE_2D, GameHelper.TYPE_2D_CENTERED, GameHelper.TYPE_3D</code>
      */
     public int type;
-    private int fullscreenKey;
-    private boolean hasFullscreenKey;
-    public float mouseX;
-    public float mouseY;
+    public double mouseX;
+    public double mouseY;
     /**
      * @param type The type of the GUI.  See <code>GameHelper.TYPE_2D, GameHelper.TYPE_2D_CENTERED, GameHelper.TYPE_3D</code>
      * @param helper The helper that the GUI is running on.  Can be null.  Used for automatic type shifting whenever the helper's type changes.
@@ -76,8 +72,6 @@ public class GUI{
             throw new IllegalArgumentException("The most recent tick can't be in the future!");
         }
         Exception theException = null;
-        theException=processKeyboard(theException);
-        theException=processMouse(theException);
         doActions();
         if(type==GameHelper.MODE_3D||type==GameHelper.MODE_HYBRID){
             helper.make2D();
@@ -96,119 +90,50 @@ public class GUI{
             throw new RuntimeException(theException);
         }
     }
-    private Exception processMouse(Exception theException){
-        boolean needsStatic = !mouseWereDown.isEmpty();
-        while(Mouse.next()){
-            needsStatic = false;
-            int button = Mouse.getEventButton();
-            boolean pressed = Mouse.getEventButtonState();
-            int wheelChange = Mouse.getEventDWheel();
-            int xChange = Mouse.getEventDX();
-            int yChange = -Mouse.getEventDY();
-            float x = Mouse.getEventX();
-            float y = Display.getHeight()-Mouse.getEventY();
-            if(menu!=null){
-                switch(type){
-                    case GameHelper.MODE_2D:
-                    case GameHelper.MODE_HYBRID:
-                        break;
-                    case GameHelper.MODE_2D_CENTERED:
-                        x-=Display.getWidth()/2;
-                        y-=Display.getHeight()/2;
-                        break;
-                    case GameHelper.MODE_3D:
-                        x/=Display.getHeight()/2;
-                        y/=Display.getHeight()/2;
-                        x-=(float)Display.getWidth()/Display.getHeight();
-                        y--;
-                        break;
-                }
-                if(helper!=null){
-                    x*=helper.guiScale;
-                    y*=helper.guiScale;
-                }
-                try{
-                    mouseX = x;
-                    mouseY = y;
-                    mouseEvent(button, pressed, x, y, xChange, yChange, wheelChange);
-                }catch(Exception ex){
-                    theException = ex;
-                }
-            }
-            if(pressed&&!mouseWereDown.contains(button)){
-                mouseWereDown.add(button);
-            }else if(!pressed&&mouseWereDown.contains(button)){
-                mouseWereDown.remove((Integer)button);
-            }
+    public void onMouseMoved(double xpos, double ypos) {
+        double x = xpos;
+        double y = ypos;
+        switch(type){
+            case GameHelper.MODE_2D:
+            case GameHelper.MODE_HYBRID:
+                break;
+            case GameHelper.MODE_2D_CENTERED:
+                x-=helper.displayWidth()/2f;
+                y-=helper.displayHeight()/2f;
+                break;
+            case GameHelper.MODE_3D:
+                x/=helper.displayHeight()/2f;
+                y/=helper.displayHeight()/2f;
+                x-=(float)helper.displayWidth()/helper.displayHeight();
+                y--;
         }
-        if(needsStatic&&menu!=null){
-            for(int button : mouseWereDown){
-                boolean pressed = true;
-                float x = Mouse.getX();
-                float y = Display.getHeight()-Mouse.getY();
-                switch(type){
-                    case GameHelper.MODE_2D:
-                    case GameHelper.MODE_HYBRID:
-                        break;
-                    case GameHelper.MODE_2D_CENTERED:
-                        x-=Display.getWidth()/2;
-                        y-=Display.getHeight()/2;
-                        break;
-                    case GameHelper.MODE_3D:
-                        x/=Display.getHeight()/2;
-                        y/=Display.getHeight()/2;
-                        x-=(float)Display.getWidth()/Display.getHeight();
-                        y--;
-                        break;
-                }
-                if(helper!=null&&GameHelper.MODE_3D!=type){
-                    x/=helper.guiScale;
-                    y/=helper.guiScale;
-                }else if(helper!=null){
-                    x*=helper.guiScale;
-                    y*=helper.guiScale;
-                }
-                try{
-                    persistMouseEvent(button, pressed, x, y);
-                }catch(Exception ex){
-                    theException = ex;
-                }
-            }
+        x*=helper.guiScale;
+        y*=helper.guiScale;
+        mouseX = x;
+        mouseY = y;
+        if(menu!=null) menu.onMouseMove(x, y);
+    }
+    public void onMouseButton(int button, int action, int mods) {
+        if(GLFW.GLFW_PRESS==action&&!mouseWereDown.contains(button)){
+            mouseWereDown.add(button);
+        }else if(action==GLFW.GLFW_RELEASE&&mouseWereDown.contains(button)){
+            mouseWereDown.remove((Integer)button);
         }
-        return theException;
+        if(menu!=null) menu.onMouseButton(button, action==GLFW.GLFW_PRESS, mods);
     }
-    protected void persistMouseEvent(int button, boolean pressed, float x, float y){
-        if(menu!=null)menu.persistMouseEvent(button, pressed, x, y);
+    public void onMouseScrolled(double xoffset, double yoffset) {
+        if(menu!=null) menu.onMouseScrolled(xoffset, yoffset);
     }
-    protected void mouseEvent(int button, boolean pressed, float x, float y, int xChange, int yChange, int wheelChange){
-        if(menu!=null)menu.mouseEvent(button, pressed, x, y, xChange, yChange, wheelChange);
-    }
-    private Exception processKeyboard(Exception theException){
-        while(Keyboard.next()){
-            char character = Keyboard.getEventCharacter();
-            int key = Keyboard.getEventKey();
-            boolean pressed = Keyboard.getEventKeyState();
-            boolean isRepeat = Keyboard.isRepeatEvent();
-            if(menu!=null){
-                if(hasFullscreenKey&&key==fullscreenKey&&pressed&&!isRepeat){
-                    helper.toggleFullscreen();
-                }
-                try{
-                    keyboardEvent(character, key, pressed, isRepeat);
-                }catch(Exception ex){
-                    theException = ex;
-                }
-            }
-            if(pressed&&!keyboardWereDown.contains(key)){
-                keyboardWereDown.add(key);
-            }else if(!pressed&&keyboardWereDown.contains(key)){
-                keyboardWereDown.remove((Integer)key);
-            }
+    public void onKeyEvent(int key, int scancode, int event, int modifiers) {
+        if(event==GLFW.GLFW_PRESS&&!keyboardWereDown.contains(key)){
+            keyboardWereDown.add(key);
+        }else if(event==GLFW.GLFW_RELEASE&&keyboardWereDown.contains(key)){
+            keyboardWereDown.remove((Integer)key);
         }
-        return theException;
+        if(menu!=null) menu.keyEvent(key, scancode, GLFW.GLFW_PRESS==event, GLFW.GLFW_REPEAT==event, modifiers);
     }
-    protected void keyboardEvent(char character, int key, boolean pressed, boolean isRepeat){
-        if(menu!=null)menu.keyboardEvent(character, key, pressed, isRepeat);
+    public void onCharTyped(char c) {
+        if(menu!=null) menu.onCharTyped(c);
     }
     /**
      * Increments the <code>tick</code> variable and ticks the menu
@@ -223,19 +148,19 @@ public class GUI{
             }
         }
     }
-    public void setFullscreenKey(int key){
-        fullscreenKey = key;
-        hasFullscreenKey = true;
-    }
-    public void clearFullscreenKey(){
-        hasFullscreenKey = false;
-    }
-    public boolean hasFullscreenKey(){
-        return hasFullscreenKey;
-    }
-    public int getFullscreenKey(){
-        return fullscreenKey;
-    }
+//    public void setFullscreenKey(int key){
+//        fullscreenKey = key;
+//        hasFullscreenKey = true;
+//    }
+//    public void clearFullscreenKey(){
+//        hasFullscreenKey = false;
+//    }
+//    public boolean hasFullscreenKey(){
+//        return hasFullscreenKey;
+//    }
+//    public int getFullscreenKey(){
+//        return fullscreenKey;
+//    }
     private static class PendingAction{
         private final ActionListener l;
         private final ActionEvent e;
@@ -255,5 +180,11 @@ public class GUI{
         while(!pending.isEmpty()){
             pending.dequeue().perform();
         }
+    }
+    public void onWindowFocused(boolean focused) {
+        if(menu!=null) menu.onWindowFocused(focused);
+    }
+    public void onFileDropped(String[] files) {
+        if(menu!=null) menu.onFilesDropped(files);
     }
 }

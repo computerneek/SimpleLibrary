@@ -13,6 +13,7 @@ import java.util.logging.Logger;
 import javax.imageio.ImageIO;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL30;
+import simplelibrary.Queue;
 import simplelibrary.Sys;
 import simplelibrary.error.ErrorCategory;
 import simplelibrary.error.ErrorLevel;
@@ -44,6 +45,7 @@ public class ImageStash{
     private final HashMap<String, Integer> bufferMap = new HashMap<>();
     private final ArrayList<Integer> buffers = new ArrayList<>();
     private final HashMap<Integer, Integer> bufferToTextureMap = new HashMap<>();
+    private final Queue<Integer> buffersToDelete = new Queue<>();
     private int boundBuffer;
     private static void generateTextureNames(IntBuffer intBuffer) {
         GL11.glGenTextures(intBuffer);
@@ -54,6 +56,7 @@ public class ImageStash{
     public static IntBuffer createDirectIntBuffer(int bufferSize) {
         return createDirectByteBuffer(bufferSize << 2).asIntBuffer();
     }
+    private Thread myThread;
     {
         missingTextureImage = new BufferedImage(256, 256, 2);
         Graphics g = missingTextureImage.getGraphics();
@@ -63,6 +66,7 @@ public class ImageStash{
         g.setColor(Color.BLACK);
         g.drawChars(chars, 0, chars.length, 75, 127);
         g.dispose();
+        myThread = Thread.currentThread();
     }
     /**
      * Gets the integer name associated with the string
@@ -73,6 +77,9 @@ public class ImageStash{
      * @since 1.5
      */
     public int getTexture(String filename){
+        if(!buffersToDelete.isEmpty()&&myThread==Thread.currentThread()){
+            deleteBuffer(buffersToDelete.dequeue());
+        }
         if(filename==null||filename.isEmpty()||filename.equals("X")){
             return -1;
         }
@@ -263,6 +270,10 @@ public class ImageStash{
         return textureMap.containsKey(path);
     }
     public void deleteBuffer(int bufferName){
+        if(myThread!=Thread.currentThread()){
+            buffersToDelete.enqueue(bufferName);
+            return;
+        }
         if(bufferToTextureMap.containsKey(bufferName)) deleteTexture(bufferToTextureMap.remove(bufferName));
         GL30.glDeleteFramebuffers(bufferName);
         String[] keys = bufferMap.keySet().toArray(new String[bufferMap.size()]);

@@ -9,8 +9,6 @@ public class MenuComponentPasswordBox extends MenuComponentTextBox{
         super(x, y, width, height, text, editable);
     }
     @Override
-    public void mouseEvent(double x, double y, int button, boolean isDown){}
-    @Override
     public void render(){
         drawRect(x, y, x+width, y+height, ImageStash.instance.getTexture("/gui/textBox.png"));
         if(textInset<0){

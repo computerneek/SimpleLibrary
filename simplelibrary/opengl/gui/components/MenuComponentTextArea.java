@@ -2,19 +2,16 @@ package simplelibrary.opengl.gui.components;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.logging.Logger;
+import static org.lwjgl.glfw.GLFW.*;
 import org.lwjgl.opengl.GL11;
 import simplelibrary.game.GameHelper;
-import simplelibrary.opengl.ImageStash;
 public class MenuComponentTextArea extends MenuComponent{
     private static final Logger LOG = Logger.getLogger(MenuComponentTextArea.class.getName());
     public ArrayList<String> text;
-    private double pixelsScrolled;
-    private double pixelsScrollable;
-    private boolean isScrolling;
     protected double textHeight;
+    public boolean editable;
     public double textInset = -1;
-    public double scrollbarWidth = -1;
-    public MenuComponentTextArea(double x, double y, double width, double height, double textHeight, String[] display){
+    public MenuComponentTextArea(double x, double y, double width, double height, double textHeight, String[] display, boolean editable){
         super(x, y, width, height);
         text = new ArrayList<>(Arrays.asList(display));
         this.textHeight = textHeight;
@@ -36,61 +33,29 @@ public class MenuComponentTextArea extends MenuComponent{
         for (String str : text) {
             do{
                 GL11.glColor4f(0, 0, 0, 1);
-                str = drawTextWithWrapAndBounds(x+textInset, y+textInset+line*textHeight-pixelsScrolled, x+width-textInset-(pixelsScrollable>0?(width/20):0), y+textInset+line*textHeight+textHeight-pixelsScrolled, x+textInset, y+textInset, x+width-textInset, y+height-textInset, str);
+                str = drawTextWithWrapAndBounds(x+textInset, y+textInset+line*textHeight, x+width-textInset, y+textInset+line*textHeight+textHeight, x+textInset, y+textInset, x+width-textInset, y+height-textInset, str);
                 GL11.glColor4f(1, 1, 1, 1);
                 line++;
             }while(str!=null&&!str.isEmpty());
         }
         double bufferHeight = line*textHeight;
-        pixelsScrollable = -height+bufferHeight;
-        if(scrollbarWidth<0){
-            switch(parent.gui.type){
-                case GameHelper.MODE_2D:
-                case GameHelper.MODE_HYBRID:
-                case GameHelper.MODE_2D_CENTERED:
-                    scrollbarWidth = 20;
-                    break;
-                case GameHelper.MODE_3D:
-                    scrollbarWidth = width/20;
-                    break;
-            }
-        }
-        if(pixelsScrollable<=0){
-            pixelsScrolled = 0;
-        }else{
-            if(pixelsScrolled>pixelsScrollable){
-                pixelsScrolled = pixelsScrollable;
-            }
-            drawRect(x+width-scrollbarWidth, y, x+width, y+height, ImageStash.instance.getTexture("/gui/scrollbar/background.png"));
-            double scrollbarPos = pixelsScrolled/pixelsScrollable;
-            int distDown = (int)(scrollbarPos*(height-scrollbarWidth));
-            drawRect(x+width-scrollbarWidth, y+distDown, x+width, y+distDown+scrollbarWidth, ImageStash.instance.getTexture("/gui/scrollbar/bar.png"));
+    }
+    @Override
+    public void keyEvent(int key, int scancode, boolean isPress, boolean isRepeat, int modifiers) {
+        if(!(isPress||isRepeat)||!editable) return;
+        switch(key){
+            case GLFW_KEY_TAB:
+                parent.onTabPressed(this); break;
+            case GLFW_KEY_ENTER:
+                text.add("");
+            case GLFW_KEY_BACKSPACE:
+                String txt = text.get(text.size()-1);
+                if(!txt.isEmpty()) text.set(text.size()-1, txt.substring(0, txt.length()-1));
+                else if(text.size()>1) text.remove(text.size()-1);
         }
     }
     @Override
-    public void mouseEvent(double x, double y, int button, boolean isDown){
-        if(!isDown){
-            isScrolling = false;
-        }
-        if(button==0){
-            if(pixelsScrollable>0&&x>=width-20){
-                isScrolling = isDown;
-                mouseDragged(x, y, button);
-            }
-        }
-    }
-    @Override
-    public void mouseDragged(double x, double y, int button){
-        if(pixelsScrollable>0&&isScrolling&&button==0){
-            double newPos = y;
-            if(newPos<scrollbarWidth/2){
-                newPos = scrollbarWidth/2;
-            }else if(newPos>height-scrollbarWidth/2){
-                newPos = height-scrollbarWidth/2;
-            }
-            newPos-=scrollbarWidth/2;
-            double decimal = newPos/(height-scrollbarWidth);
-            pixelsScrolled = (int)(decimal*pixelsScrollable);
-        }
+    public void onCharTyped(char c) {
+        if(!Character.isWhitespace(c)&&editable) text.set(text.size()-1, text.get(text.size()-1)+c);
     }
 }

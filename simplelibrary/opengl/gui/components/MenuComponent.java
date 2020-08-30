@@ -3,8 +3,6 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Point;
 import java.awt.Rectangle;
-import java.util.ArrayList;
-import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
 import simplelibrary.opengl.gui.Menu;
 /**
@@ -83,41 +81,6 @@ public abstract class MenuComponent extends Menu{
         }
     }
     /**
-     * Called when the mouse is dragged on the component
-     * @param x The mouse X location 
-     * @param y
-     * @param button
-     */
-    public void mouseDragged(double x, double y, int button){}
-    /**
-     * Called when a mouse event occurs on the component, as different from a subcomponent.
-     * @param x The mouse X location relative to the component, in GL coordinates
-     * @param y The mouse Y location relative to the component, in GL coordinates
-     * @param button Which mouse button has produced the event (-1 is no button, 0 is left click, 1 is middle click, 2 is right click)
-     * @param isDown If the acting button is up or down.  Will always be <code>false</code> when the button is -1.
-     */
-    public void mouseEvent(double x, double y, int button, boolean isDown){}
-    public void mouseover(double x, double y, boolean isMouseOver){
-        this.isMouseOver = isMouseOver;
-        if(!isSelected&&selected!=null){
-            selected.isSelected = false;
-            selected = null;
-        }
-        for(MenuComponent c : components){
-            c.mouseover(x-c.x, y-c.y, isMouseOver&&x>=c.x&&y>=c.y&&x<=c.x+c.width&&y<=c.y+c.height);
-        }
-    }
-    /**
-     * Called when a keyboard event occurs while this component is selected.
-     * @param character The character that was typed; may be -1 if no character was typed, may also be unprintable
-     * @param key The key that was pressed (LWJGL indexes; use the variables from <code>org.lwjgl.input.Keyboard</code>)
-     * @param pressed If the key is down
-     * @param repeat If this is a repeat event from a key being held down
-     */
-    public void processKeyboard(char character, int key, boolean pressed, boolean repeat){
-        parent.processKeyboard(character, key, pressed, repeat);
-    }
-    /**
      * Draws this component on the screen
      */
     public abstract void render();
@@ -165,56 +128,8 @@ public abstract class MenuComponent extends Menu{
         if(parent!=null) parent.buttonClicked(button);
         else throw new UnsupportedOperationException("Override missing- "+getClass().getName()+" has buttons but never handles events!");
     }
-    public void listButtonClicked(ListComponentButton button){
-        if(parent!=null) parent.listButtonClicked(button);
-        else throw new UnsupportedOperationException("Override missing- "+getClass().getName()+" has list buttons but never handles events!");
-    }
     public boolean onTabPressed(MenuComponent component){return false;}
     public boolean onReturnPressed(MenuComponent component){return false;}
-    public void keyboardEvent(char character, int key, boolean pressed, boolean repeat){
-        if(selected!=null){
-            selected.keyboardEvent(character, key, pressed, repeat);
-        }
-        else{
-            processKeyboard(character, key, pressed, repeat);
-        }
-    }
-    public void mouseEvent(int button, boolean pressed, float x, float y, float xChange, float yChange, int wheelChange){
-        boolean found = false;
-        for(MenuComponent component : components){
-            if(isClickWithinBounds(x, y, component.x, component.y, component.x+component.width, component.y+component.height)){
-                component.mouseEvent(button, pressed, x-(float)component.x, y-(float)component.y, xChange, yChange, wheelChange);
-                found = true;
-                if(button>=0&&button<3&&gui.mouseWereDown.contains(button)!=pressed){
-                    selected = component;
-                    component.isSelected = true;
-                }
-            }else{
-                if(button>=0&&button<3&&gui.mouseWereDown.contains(button)!=pressed){
-                    if(selected==component){
-                        selected=null;
-                    }
-                    component.isSelected=false;
-                }
-                component.mouseover(-1, -1, false);
-            }
-        }
-        if(wheelChange!=0&&!found){
-            if(selected==null||!selected.mouseWheelChange(wheelChange)){
-                mouseWheelChange(wheelChange);
-            }
-        }
-        if(!found){
-            mouseover(x, y, true);
-            for(int i = 0; i<3; i++){
-                if(button==i&&gui.mouseWereDown.contains(button)!=pressed){
-                    mouseEvent(x, y, i, pressed);
-                }else if(button==-1&&Mouse.isButtonDown(i)){
-                    mouseDragged(x, y, i);
-                }
-            }
-        }
-    }
     @Override
     public void render(int millisSinceLastTick) {
         if(addRenderBound(x, y, x+width, y+height)){//Accounts for position and size-restriction; also, if component is offscreen, don't draw.
@@ -238,5 +153,29 @@ public abstract class MenuComponent extends Menu{
     public void renderForeground(){}
     protected Color defaultForegroundColor(){
         return Color.WHITE;
+    }
+    public void onMouseMove(double x, double y){
+        isMouseOver = true;
+        for(MenuComponent c : components){
+            if(isClickWithinBounds(x, y, c.x, c.y, c.x+c.width, c.y+c.height)){
+                c.onMouseMove(x-c.x, y-c.y);
+            }else{
+                c.onMouseMovedElsewhere(x-c.x, y-c.y);
+            }
+        }
+    }
+    public void onMouseMovedElsewhere(double x, double y) {
+        //Only isMouseOver==false.  Doing much else, or anything unrelated to isMouseOver changing state, is not recommended.
+        isMouseOver = false;
+        for(MenuComponent c : components){
+            c.onMouseMovedElsewhere(x-c.x, y-c.y);
+        }
+    }
+    public void onDeselected() {
+        //Something else was selected
+        isSelected = false;
+    }
+    public void onSelected() {
+        isSelected = true;
     }
 }

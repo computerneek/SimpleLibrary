@@ -1,30 +1,8 @@
 package simplelibrary.opengl;
-import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.GL11;
 import simplelibrary.font.FontManager;
 
 public class Renderer3D{
-    /**
-     * Tests if the specified point is within the specified rectangle.
-     * 
-     * Overload for isPointWithinBounds()
-     * 
-     * This convenience method may be of no use- the contents are as follows:
-     * 
-     * <code>return isPointWithinBounds(pointX/(Display.getHeight()/2)-((double)Display.getWidth()/(double)Display.getHeight()), pointY/(Display.getHeight()/2)-1, targetXMin, targetYMin, targetXMax, targetYMax);</code>
-     * 
-     * @param pointX The point X-coordinate to test, in screen pixel coordinates
-     * @param pointY The point Y-coordinate to test, in screen pixel coordinates
-     * @param targetXMin The minimum X-coordinate
-     * @param targetYMin The minimum Y-coordinate
-     * @param targetXMax The maximum X-coordinate
-     * @param targetYMax The maximum Y-coordinate
-     * @return if the specified point is within the specified rectangle
-     * @since GUI module 3.3.0.0
-     */
-    public static boolean isScaledPointWithinBounds(double pointX, double pointY, double targetXMin, double targetYMin, double targetXMax, double targetYMax){
-        return isPointWithinBounds(pointX/(Display.getHeight()/2)-(Display.getWidth()/Display.getHeight()), pointY/(Display.getHeight()/2)-1, targetXMin, targetYMin, targetXMax, targetYMax);
-    }
     /**
      * Tests that the specified point is within the specified rectangle.
      * 

@@ -1,27 +1,226 @@
 package simplelibrary.game;
-import java.awt.Canvas;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.function.Consumer;
+import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.swing.JFrame;
-import org.lwjgl.LWJGLException;
-import org.lwjgl.input.Controllers;
-import org.lwjgl.input.Keyboard;
-import org.lwjgl.input.Mouse;
-import org.lwjgl.opengl.Display;
+import static org.lwjgl.glfw.GLFW.*;
+import org.lwjgl.glfw.GLFWCharCallback;
+import org.lwjgl.glfw.GLFWCursorPosCallback;
+import org.lwjgl.glfw.GLFWDropCallback;
+import org.lwjgl.glfw.GLFWErrorCallback;
+import org.lwjgl.glfw.GLFWKeyCallback;
+import org.lwjgl.glfw.GLFWMouseButtonCallback;
+import org.lwjgl.glfw.GLFWScrollCallback;
+import org.lwjgl.glfw.GLFWWindowFocusCallback;
+import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.PixelFormat;
-import org.lwjgl.util.glu.GLU;
 import simplelibrary.Sys;
 import simplelibrary.error.ErrorCategory;
 import simplelibrary.error.ErrorLevel;
 import simplelibrary.opengl.ImageStash;
 import simplelibrary.opengl.Renderer2D;
+import simplelibrary.opengl.gui.GUI;
 import simplelibrary.window.WindowHelper;
-public class GameHelper extends Thread{
+/**
+ * An automatic tick & render management system, featuring full multithreading capability.
+ * <hr>
+ * The GameHelper can be constructed, configured, and managed on any thread- but, for the underlying GLFW backend (through LWJGL) to work correctly, <code>run()</code> MUST be called from the application main thread.
+ * <p>Also, beware that <code>run()</code> will capture the main thread until the GameHelper is shut down.  Any thread can be used to manage the active tick and render operations.</p>
+ * <p>If no tick or render setup was performed prior to calling <code>run()</code>, such that the GameHelper will not be doing anything, it will return immediately.</p>
+ * <hr>
+ * ----THE TICK SYSTEM----
+ * <p>The GameHelper is actually equipped with two separate tick systems:  The Standard tick system, and the Pool tick system.  Both systems are internally synchronized, and will tick at the same rate;
+ * both systems can be used at once, if desired.  Tick rate can be set with either <code>setTickRate(int)</code> or <code>setTickTime(long)</code>.  The master tick rate is controlled by the application main thread.</p>
+ * <p>The Standard Tick System is activated and used by calling <code>addTickMethod(TickMethod)</code>.  Each new method is assigned its own new thread; single-threaded applications need only call it once.
+ * If <code>addTickMethod()</code> is called before the GameHelper is launched with <code>run()</code>, the thread is not started immediately- rather, it is started during the initialization step.
+ * A tick method created by <code>addTickMethod()</code> can be removed by setting its <code>TickMethod.terminate=true</code>; the thread will then self-terminate, and its <code>TickMethod</code> deleted.
+ * If lost, the <code>TickMethod</code> can be retrieved by calling <code>getTickMethod()</code> <i>on the affected thread</i>.
+ * If <code>addTickMethod()</code> is called after <code>run()</code>, its thread will be spawned on the next main thread tick.
+ * When the <code>GameHelper</code> is shut down via <code>running==false</code>, all active Standard Tick System threads call <code>TickMethod.finalTick()</code> once before termination.
+ * <code>TickMethod.finalTick()</code> is NOT called when a thread is terminated via <code>terminate=true</code>, only when the <code>GameHelper</code> is shut down- and a thread which has been terminated
+ * will not call <code>TickMethod.finalTick()</code> on <code>GameHelper</code> shutdown.</p>
+ * <p>The Pool Tick System is far more dynamic.  A thread pool is used to tick an arbitrary number of <code>TickObject</code>s; the number of objects can change dynamically from tick to tick by any scale,
+ * without inducing thread creation or death events.  Objects can be added to the list at any time, and by any thread, via <code>addTickObject(TickObject)</code>; a reasonable effort is made to tick all objects in sync
+ * with the main tick loop.  Objects can be removed by setting their <code>TickObject.dead=true</code>.  The number of threads in the pool can be adjusted with <code>setThreadPoolSize(int)</code>, default 0;
+ * however, whenever there are any tick objects on the list, the thread pool will have a minimum size of 1.  Pool threads will self-terminate between tick operations if there are too many, and new threads will be
+ * spawned as needed by the application main thread, maximum 1 per tick.
+ * <code>TickObject</code>s are never informed of GameHelper shutdown, unlike <code>TickMethod</code>s in the Standard Tick System.  In exchange, the Pool Tick System can be placed into Turbo Mode via
+ * <code>setPoolTurbo(boolean)</code>, where the Pool Tick System has an indefinite maximum tick rate.  This does not effect the Standard Tick System, which remains at the set rate.
+ * When in Turbo Mode, the Pool Tick System will automatically yield to the Standard Tick System and any render threads,
+ * preventing other parts of the application from being lagged down by excessive Pool activity.  The Pool Tick System is most efficient when the <code>TickObject</code>s all have at least some processing to do,
+ * as all pool threads must use an exclusive lock when fetching a <code>TickObject</code> from the list or returning it.</p>
+ * <hr>
+ * ----THE RENDER SYSTEM----
+ * <p>The GameHelper Render System can support any number of <code>Display</code>s.
+ * As the GLFW backend in the underlying LWJGL library requires window creation, setup, and destruction events to be performed on the main thread, all such events are performed either when <code>run()</code>
+ * is called, on the next main thread tick, or on GameHelper shutdown (destruction of all windows).  However, <i>any</i> thread can request such changes, by creating new <code>Display</code>s.
+ * A single <code>Display</code> object can control multiple monitors; each window of each <code>Display</code> is assigned its own render thread and GUI object, allowing different menus to be displayed on
+ * different windows.  GUI objects can be linked if desired, via <code>Display.link(GUI, GUI)</code> or <code>Display.linkAllGUIs()</code>, allowing the linked GUIs to render elements overtop each other-
+ * and detect clicks on the same.
+ * Note that all windows within the same <code>Display</code> run with exactly the same render function, and simply have different projections; as such, in multi-window rendering with a single Display, the
+ * <code>render()</code> function may be invoked multiple times in parallel.  Any render thread may call <code>Display.getWindow()</code> to identify which window it is running on.</p>
+ * @author Bryan
+ */
+public class GameHelper{
+//    //<editor-fold defaultstate="collapsed" desc="Constants">
+//    //</editor-fold>
+//    //<editor-fold defaultstate="collapsed" desc="Variables">
+//    /**
+//     * If any thread is allowed to see the `running` variable as true.  Used for fatal errors, when a thread must be terminated.
+//     */
+//    private static boolean allowRunning = true;
+//    /**
+//     * All threads, both tick and render, will self-terminate gracefully when this is set to false.  Tick threads will be given a 'final tick' notification.  All open windows will be closed.
+//     * This is set to <code>true</code> by the <code>run()</code> method.
+//     */
+//    private boolean running = false;
+//    /**
+//     * Desired number of worker threads in the thread pool driving the dynamic tick pool.
+//     */
+//    private int desiredTickPoolSize = 0;
+//    /**
+//     * Nanoseconds per tick.  Default 50mil, for 20 ticks per second.
+//     */
+//    private long nanosPerTick = 50_000_000;// 1/20 of a second; 20TPS
+//    /**
+//     * Nanosecond time of when the most recent tick started.  Main tick counter will wait for System.nanoTime()>=lastTickTime+nanosPerTick before authorizing the next tick.
+//     */
+//    private long lastTickTime = 0;
+//    /**
+//     * Internal tick counter
+//     */
+//    private long tickNum = 0;
+//    /**
+//     * Maximum amount of "lag" time allowed.  Recommend minimum of 1 tick in length.
+//     * This is the amount of time by which the master tick counter is allowed to "lag" behind the point it's supposed to be.
+//     * If it lags further than this, the "supposed to be" point is dragged back with it, and may result in slowing 
+//     */
+//    private long maxLagTicksNanos = 1_000_000_000;//1s max lag
+//    /**
+//     * Maximum number of ticks ahead that one thread or object is allowed to be than another.
+//     * Negative values disable this function; objects/threads are then allowed to independently maintain appropriate tickrate.
+//     * At all other values, for any arbitrary tick number X and misallign value N, any given tick thread/object is allowed to start tick X+N before other threads/objects have finished tick X,
+//     * but NOT before other threads/objects have finished tick X-1.
+//     * A value of 0 forces all threads/objects to complete one tick before any may start the next tick;
+//     * a value of 1 allows the barrier between any two ticks to be blurred, but will not allow a third tick to be started until the first has been finished.
+//     * At -1, the master tick timer 
+//     */
+//    private long maxMissalignTicks = -1;//Disable alignment forcing- if one thread locks up, don't let it lock everything else up.
+//    /**
+//     * Maximum number of nanoseconds a ticking thread or object is allowed to take before it is interrupted.
+//     * Note:  Limit is not enforced with precision.
+//     * Set to -1 to disable timeout.
+//     * Highly recommended to set this value to at least twice the nanosPerTick, if used; shorter may truncate "normal" ticks.
+//     * This timeout is designed to catch infinite loop or deadlock conditions- thread stack trace is captured and logged before Thread.interrupt() is called, and error logging is force-enabled.
+//     * If a thread needs to be interrupted a 3rd time on the same tick with matching stack trace, or a 6th time with distinct stack trace, the thread is considered to have "crashed"- which will
+//     * be fed into the CrashManager.
+//     * All threads are terminated, via allowRunning=false, and the offending thread is terminated via Thread.terminate();
+//     */
+//    private long tickTimeout = -1;//Disable tick timeout- ticks will not be terminated for taking too long
+//    /**
+//     * Whether to run the tick pool in "turbo mode", which orders it to run the pool at maximum power- no pool thread should spend any time idling in "turbo mode", unless there are more threads than tick objects.
+//     * When in "turbo mode", the tick pool runs at maximum rate, independent of the main tick rate.
+//     * The main tick loops- "tick methods"- will run at the normal tick rate.
+//     * When in turbo mode, the tick pool will self-suspend (via yield()) as necessary to allow the tick method threads, and all render threads, to run at an acceptable rate.
+//     * This is done to prevent the pool from lagging the rest of the application, in the event that the pool has a size that is equal to the number of available logical cores.
+//     */
+//    private boolean poolTurbo = false;
+//    private ArrayList<Thread> tickPool = new ArrayList<>();
+//    private ArrayList<TickMethod> tickMethods = new ArrayList<>();
+//    /**
+//     * Shutdown hooks, to be run (sequential) on the main thread after tick/render shutdown, before release back to the calling function.
+//     * Runs on shutdown of the GameHelper, rather than shutdown of the JVM; hooks may not run if the application is terminated externally.
+//     * Hooks may be attempted on a fatal error, if the CrashManager allows.
+//     */
+//    private ArrayList<Runnable> shutdownHooks = new ArrayList<>();
+//    /**
+//     * In the event of a fatal error, this is run on the application main thread prior to application shutdown.
+//     * If absent, a default crash manager is used, which describes the logfile location and asks the user to report the error to the application developer.
+//     * Jarfile meta-inf data is used to determine developer, if possible; otherwise, the offending jarfile(s) are named,
+//     * and the file in which the class that first created the GameHelper is located will be cited as the application.
+//     * If this is <code>null</code>, the crash detection system- including deadlock or 
+//     */
+//    public CrashManager crashManager;
+//    /**
+//     * The fatal error that will be fed to the crash manager.
+//     */
+//    private final FatalError fate = new FatalError();
+//    //</editor-fold>
+//    //<editor-fold defaultstate="collapsed" desc="Inner Classes">
+//    public abstract class TickMethod{
+//        public boolean terminate = false;
+//        private Thread thread;
+//        public abstract void tick();
+//        public abstract void finalTick();
+//    }
+//    public abstract class TickObject{
+//        public boolean dead = false;
+//        public abstract void tick();
+//    }
+//    private class FatalError{
+//        /**
+//         * The stack trace at the creation of the FatalError, which is created when the GameHelper is created.
+//         * May be used, when no developer data can be found in the offending jarfiles in a fatal error, to determine the "main" application file for examination.
+//         */
+//        private StackTraceElement[] launchTrace;
+//        {
+//            launchTrace = Thread.currentThread().getStackTrace();
+//        }
+//    }
+//    public abstract class CrashManager{
+//        /**
+//         * <p>Whether the application should shut down because of this crash or not.  Default <code>true</code>.  If set to <code>false</code>, the terminated thread will be restarted, and this variable
+//         * will be reset to <code>true</code> after the error completes.
+//         * It is highly recommended to leave this at <code>true</code>, unless the cause of the error is KNOWN to be recoverable, and recovery of any damaged data was verified successful.
+//         * Try not to rely on this function to detect recoverable errors, as by the time the CrashManager is triggered, the application user will likely have noticed the problem.</p>
+//         * <p>Additionally, this is a last-ditch crash detection system, specifically designed to catch a deadlock or infinite loop, and force the application to close properly.</p>
+//         * <p>A repeated failure on a single thread or object may also be reported through a <code>FatalError</code>-
+//         * for example, if a <code>TickObject</code>, <code>TickMethod</code>, or render thread encounters an identical error many times in a row, such that the GameHelper must catch every instance of it.
+//         * This will not trigger a full crash- instead, <code>CrashManager.threadCrash()</code> will be called.  If this function returns <code>true</code>, as its default implementation does, it will fall
+//         * through to a full application crash.
+//         */
+//        public boolean shutdown = true;
+//        /**
+//         * Called when a <code>TickObject</code>, <code>TickMethod</code> or <code>DisplayWindow</code> (render thread) crashes on the exact same error several times in a row.
+//         * @param crashing The object causing the crash.  It will be a <code>TickObject</code>, <code>TickMethod</code>, or <code>DisplayWindow</code> for render-related errors.
+//         * @param ex The exception that was thrown multiple times.
+//         * @return Whether the error should cascade into a full application crash, via this <code>CrashManager</code>.  Default <code>true</code>.
+//         */
+//        public boolean threadCrash(Object crashing, Throwable ex){
+//            return true;//By default, we don't care what's crashing, or why, it's a dead failure, and an "application crash".  Application logic can be used to override- not recommended.
+//        }
+//    }
+//    private class DisplayWindow{}
+//    //</editor-fold>
+//    //<editor-fold defaultstate="collapsed" desc="Methods">
+//    /**
+//     * Attempts to get the <code>TickMethod</code> object governing the current thread.  If no <code>TickMethod</code> was found, <code>null</code> is returned.
+//     */
+//    public TickMethod getTickMethod(){
+//        synchronized(tickMethods){
+//            Thread t = Thread.currentThread();
+//            for(TickMethod m : tickMethods){
+//                if(m.thread==Thread.currentThread()) return m;
+//            }
+//        }
+//        return null;
+//    }
+//    //addTickMethod(TickMethod)
+//    //</editor-fold>
+    
+    
+    
+    
+    
+    
+    
+    
+    
     //<editor-fold defaultstate="collapsed" desc="variables">
     public static final int MODE_2D = 1;
     public static final int MODE_2D_CENTERED = 2;
@@ -37,10 +236,6 @@ public class GameHelper extends Thread{
     private static final Logger LOG = Logger.getLogger(GameHelper.class.getName());
     private int height = 500;
     private int width = 800;
-    private boolean usesControllers;
-    private boolean usesMouse;
-    private boolean usesKeyboard;
-    private int framerateCap;
     private Method tickMethod;
     private Method renderMethod;
     private Method renderInitMethod;
@@ -57,21 +252,14 @@ public class GameHelper extends Thread{
     private Object renderInitObject;
     private Object tickObject;
     private Object renderObject;
-    public JFrame frame;
-    public Canvas canvas;
     private int mode = MODE_2D;
     private int tickRate = 20;
     public float guiScale = 1;
     private float lastGuiScale;
-    private boolean self;
-    private boolean fullscreen;
-    private boolean wasFullscreen;
     private Thread renderThread;
     private long tickTime;
     private Method finalInitMethod;
     private Object finalInitObject;
-    private boolean autoExitFullscreen = true;
-    private int framesSinceFullscreen;
     private boolean lightingEnabled;
     private boolean depthTestEnabled;
     private boolean is2D;
@@ -87,20 +275,12 @@ public class GameHelper extends Thread{
     private boolean wasLightingEnabledBeforeFramebuffer;
     private boolean wasDepthTestEnabledBeforeFramebuffer;
     private Object timer = new Object();//Synchronization object to prevent data races in render loop timing
+    private Object timer2 = new Object();
+    private long tickTarget;
     private int multisampleCount;
+    private GLFWErrorCallback errCall;
+    private long window;
     //</editor-fold>
-    public void setMaximumFramerate(int maxFramerate){
-        framerateCap = maxFramerate;
-    }
-    public void setUsesControllers(boolean flag){
-        usesControllers = flag;
-    }
-    public void setUsesMouse(boolean flag){
-        usesMouse = flag;
-    }
-    public void setUsesKeyboard(boolean flag){
-        usesKeyboard = flag;
-    }
     public void setDisplaySize(Dimension size){
         setDisplaySize(size.width, size.height);
     }
@@ -193,7 +373,6 @@ public class GameHelper extends Thread{
     public void setAntiAliasing(int multisampleCount){
         this.multisampleCount = multisampleCount;
     }
-    @Override
     public void start(){
         if(tickInitMethod==null&&renderInitMethod==null&&finalInitMethod==null){
             Sys.error(ErrorLevel.warning, "GameHelper Init is unused!  This is probably a bug.", null, ErrorCategory.bug, false);
@@ -219,11 +398,6 @@ public class GameHelper extends Thread{
         if(finalInitMethod!=null&&Modifier.isStatic(finalInitMethod.getModifiers())!=(finalInitObject==null)){
             throw new IllegalStateException("ERROR:  Final init method is "+(Modifier.isStatic(finalInitMethod.getModifiers())?"":"not ")+"static!");
         }
-        setName("GameHelper Tick Thread");
-        super.start();
-    }
-    @Override
-    public void run(){
 //            Runtime.getRuntime().addShutdownHook(new Thread(){
 //                @Override
 //                public void run(){
@@ -236,46 +410,46 @@ public class GameHelper extends Thread{
             tickTime = getTime();
         }
         synchronized(this){
+            createDisplay();
             kickoffRenderThread();
             try {
                 wait();
             } catch (InterruptedException ex) {}
         }
         callFunction("FinalInit", finalInitMethod, finalInitObject, new Object[0]);
+        long targTime, curTime;
         while(running){
-            synchronized(timer){
-                tickTime = getTime();
+            targTime = tickTime+(1_000_000_000/tickRate);
+            while((curTime=targTime-getTime())>0){
+                if(curTime>2_000_000) try {
+                    Thread.sleep(1);
+                } catch (InterruptedException ex) {}
             }
+            glfwPollEvents();
             callFunction("Tick", tickMethod, tickObject, false);
-            Display.sync(tickRate);
+            tickTime = targTime;
         }
         try {
             renderThread.join();
         } catch (InterruptedException ex) {}
+        destroyDisplay();
         callFunction("FinalTick", tickMethod, tickObject, true);
     }
     private void kickoffRenderThread() {
         renderThread = new Thread(){
             public void run(){
+                glfwMakeContextCurrent(window);
+                glfwSwapInterval(1);
+                GL.createCapabilities();
                 synchronized(GameHelper.this){
-                    createDisplay();
-                    setupControllers();
                     callFunction("renderInit", renderInitMethod, renderInitObject, new Object[0]);
                     GameHelper.this.notifyAll();
                 }
                 while(running){
-                    try {
-                        render();
-                    } catch (LWJGLException ex) {}
-                    if(framerateCap>0){
-                        Display.sync(framerateCap);
+                    render();
+                    if(glfwWindowShouldClose(window)){
+                        running = false;
                     }
-                }
-                Controllers.destroy();
-                Display.destroy();
-                if(self){
-                    frame.setVisible(false);
-                    frame.dispose();
                 }
             }
         };
@@ -283,99 +457,31 @@ public class GameHelper extends Thread{
         renderThread.start();
     }
     private void createDisplay(){
-        try{
-            if(canvas==null||!canvas.isVisible()){
-                frame = WindowHelper.createFrameWithoutAppearance(windowTitle, width, height, null);
-                frame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
-                canvas = new Canvas();
-                frame.add(canvas);
-                self = true;
-            }
-            frame.setVisible(true);
-            canvas.requestFocus();
-            Display.setParent(canvas);
-            if(background==null){
-                background = Color.BLACK;
-            }
-            Display.setVSyncEnabled(true);
-            Display.create(new PixelFormat(0, 8, 8, multisampleCount));
-            hasColorChanged = true;
-        }catch(LWJGLException ex){
-            Sys.error(ErrorLevel.severe, "Could not create display!", ex, ErrorCategory.bug);
-        }
+        glfwInit();
+        glfwSetErrorCallback(errCall=GLFWErrorCallback.createPrint(System.err));
+        glfwWindowHint(GLFW_RESIZABLE, GL11.GL_TRUE);
+        window = glfwCreateWindow(width, height, windowTitle, 0, 0);
+        glfwShowWindow(window);
+        hasColorChanged = true;
     }
-    private void setupControllers(){
-        if(!usesControllers&&!usesMouse&&!usesKeyboard){
-            Sys.error(ErrorLevel.warning, "No input used!", null, ErrorCategory.bug);
-        }
-        if(usesControllers&&(usesMouse||usesKeyboard)){
-            Sys.error(ErrorLevel.warning, "Using game controllers and mouse/keyboard at the same time is redundant!", null, ErrorCategory.bug);
-            usesMouse = false;
-            usesKeyboard = false;
-        }
-        if(usesControllers){
-            try{
-                Controllers.create();
-            }catch(LWJGLException ex){
-                Sys.error(ErrorLevel.critical, "Could not initialize controllers!", ex, ErrorCategory.LWJGL);
-            }
-        }
-        if(usesMouse){
-            try{
-                Mouse.create();
-            }catch(LWJGLException ex){
-                Sys.error(ErrorLevel.critical, "Could not initialize mouse!", ex, ErrorCategory.LWJGL);
-            }
-        }
-        if(usesKeyboard){
-            try{
-                Keyboard.create();
-            }catch(LWJGLException ex){
-                Sys.error(ErrorLevel.critical, "Could not initialize keyboard!", ex, ErrorCategory.LWJGL);
-            }
-        }
-    }
-    public boolean isFullscreen(){
-        return fullscreen;
-    }
-    public void setFullscreen(boolean fullscreen){
-        this.fullscreen = fullscreen;
-    }
-    public boolean willAutoExitFullscreen(){
-        return autoExitFullscreen;
-    }
-    public void setAutoExitFullscreen(boolean autoExit){
-        autoExitFullscreen = autoExit;
+    private void destroyDisplay(){
+        glfwDestroyWindow(window);
+        glfwTerminate();
     }
     public long getTime(){
-        return org.lwjgl.Sys.getTime()*1_000/org.lwjgl.Sys.getTimerResolution();
+        return System.nanoTime();
     }
-    private void render() throws LWJGLException{
-        if(autoExitFullscreen&&fullscreen&&!Display.isActive()&&framesSinceFullscreen>5){
-            fullscreen = false;
-        }
-        framesSinceFullscreen++;
-        if(wasFullscreen!=fullscreen){
-            if(!fullscreen){
-                frame.setVisible(true);
-                Display.setParent(canvas);
-                Display.setFullscreen(false);
-                canvas.requestFocus();
-            }else{
-                Display.setFullscreen(true);
-                frame.setVisible(false);
-                framesSinceFullscreen = 0;
-            }
-            lastWidth = 0;
-            lastHeight = 0;
-            lastGuiScale = 0;
-            wasFullscreen = fullscreen;
-        }
-        if(Display.getWidth()!=lastWidth||Display.getHeight()!=lastHeight||guiScale!=lastGuiScale||rebuildRenderSetup){
+    int[] wHeight=new int[1], wWidth=new int[1];
+    public int displayWidth(){ return wWidth[0]; }
+    public int displayHeight(){ return wHeight[0]; }
+    private void render(){
+//        glfwGetWindowSize(window, wWidth, wHeight);
+        glfwGetFramebufferSize(window, wWidth, wHeight);
+        if(displayWidth()!=lastWidth||displayHeight()!=lastHeight||guiScale!=lastGuiScale||rebuildRenderSetup){
             if(is2D&&(mode==MODE_3D||mode==MODE_HYBRID)) make3D();//So we don't confuse ourselves
-            rebuildRenderMode(mode, Display.getWidth(), Display.getHeight(), guiScale);
-            lastWidth = Display.getWidth();
-            lastHeight = Display.getHeight();
+            rebuildRenderMode(mode, displayWidth(), displayHeight(), guiScale);
+            lastWidth = displayWidth();
+            lastHeight = displayHeight();
             lastGuiScale = guiScale;
         }
         if(hasColorChanged){
@@ -385,13 +491,13 @@ public class GameHelper extends Thread{
         GL11.glLoadIdentity();
         int tTime;
         synchronized(timer){
-            tTime = (int)(getTime()-tickTime);
+            tTime = (int)((getTime()-tickTime)/1000_000);
         }
         Object value = callFunction("Render", renderMethod, renderObject, tTime);
         if(value!=null&&value instanceof Boolean&&(boolean)value){
             return;
         }
-        Display.update();
+        glfwSwapBuffers(window);
     }
     public void refreshBackgroundColor(){
         GL11.glClearColor(background.getRed()/255F, background.getGreen()/255F, background.getBlue()/255F, background.getAlpha()/255F);
@@ -405,8 +511,8 @@ public class GameHelper extends Thread{
             case MODE_3D:
             case MODE_HYBRID:
                 float aspect = width / (float)height;
-                GL11.glOrtho(-guiScale, guiScale, -guiScale, guiScale, -minRenderDistance, -maxRenderDistance);
-                GLU.gluPerspective(frameOfView, aspect, (float)minRenderDistance, (float)maxRenderDistance);
+//                GL11.glOrtho(-guiScale, guiScale, -guiScale, guiScale, -minRenderDistance, -maxRenderDistance);
+                setupPerspective();
                 break;
             case MODE_2D:
                 GL11.glOrtho(0, width*guiScale, height*guiScale, 0, 0, 100F);
@@ -418,6 +524,27 @@ public class GameHelper extends Thread{
                 break;
         }
         GL11.glMatrixMode(GL11.GL_MODELVIEW);
+    }
+    private void setupPerspective(){
+        float[] projectionMatrix = new float[16];
+        float fieldOfView = this.frameOfView;
+        float aspectRatio = (float)wWidth[0] / (float)wHeight[0];
+        float near_plane = minRenderDistance;
+        float far_plane = maxRenderDistance;
+
+        float y_scale = (float) (1/Math.tan(Math.toRadians(fieldOfView / 2f)));
+        float x_scale = y_scale / aspectRatio;
+        float frustum_length = far_plane - near_plane;
+
+        projectionMatrix[0] = x_scale;
+        projectionMatrix[5] = y_scale;
+        projectionMatrix[10] = -((far_plane + near_plane) / frustum_length);
+        projectionMatrix[11] = -1;
+        projectionMatrix[14] = -((2 * near_plane * far_plane) / frustum_length);
+        GL11.glLoadMatrixf(projectionMatrix);
+    }
+    public boolean getMouseButtonState(int button){
+        return glfwGetMouseButton(window, button)==GLFW_PRESS;
     }
     public void make2D() {
         if(mode!=MODE_3D&&mode!=MODE_HYBRID){
@@ -433,10 +560,10 @@ public class GameHelper extends Thread{
         GL11.glPushMatrix();
         GL11.glLoadIdentity();
         if(mode==MODE_3D){
-            float width = Display.getWidth()/(float)Display.getHeight()*guiScale;
+            float width = displayWidth()/(float)displayHeight()*guiScale;
             GL11.glOrtho(-width, width, guiScale, -guiScale, -1, 1);
         }else{
-            GL11.glOrtho(0, Display.getWidth()*guiScale, Display.getHeight()*guiScale, 0, 0, 100F);
+            GL11.glOrtho(0, displayWidth()*guiScale, displayHeight()*guiScale, 0, 0, 100F);
         }
         GL11.glMatrixMode(GL11.GL_MODELVIEW);
         GL11.glPushMatrix();
@@ -476,9 +603,6 @@ public class GameHelper extends Thread{
             Sys.error(ErrorLevel.severe, name+" method is not static and render object is null!", ex, ErrorCategory.bug);
         }
         return null;
-    }
-    public void toggleFullscreen() {
-        setFullscreen(!fullscreen);
     }
     /**
      * Sets the render target to the specified framebuffer.
@@ -539,10 +663,62 @@ public class GameHelper extends Thread{
             if(renderMode>0) rebuildRenderMode(renderMode, width, height, guiScale);
             else GL11.glMatrixMode(GL11.GL_MODELVIEW);
             ImageStash.instance.bindBuffer(name);
-            if(renderMode==MODE_2D){
-                GL11.glScalef(1, -1, 1);
-                GL11.glTranslatef(0, -height, 0);//Don't ask why, it just works
-            }
+            GL11.glLoadIdentity();
+//            if(renderMode==MODE_2D){
+//                GL11.glScalef(1, -1, 1);
+//                GL11.glTranslatef(0, -height, 0);//Don't ask why, it just works
+//            }
         }
+    }
+    public void assignGUI(GUI gui){
+        glfwSetKeyCallback(window, new GLFWKeyCallback() {
+            @Override
+            public void invoke(long window, int key, int scancode, int event, int modifiers) {
+                gui.onKeyEvent(key, scancode, event, modifiers);
+            }
+        });
+        glfwSetCharCallback(window, new GLFWCharCallback() {
+            @Override
+            public void invoke(long window, int codepoint) {
+                gui.onCharTyped((char)codepoint);
+            }
+        });
+        glfwSetCursorPosCallback(window, new GLFWCursorPosCallback() {
+            @Override
+            public void invoke(long window, double xpos, double ypos) {
+                gui.onMouseMoved(xpos, ypos);
+            }
+        });
+        glfwSetMouseButtonCallback(window, new GLFWMouseButtonCallback() {
+            @Override
+            public void invoke(long window, int button, int action, int mods) {
+                gui.onMouseButton(button, action, mods);
+            }
+        });
+        glfwSetScrollCallback(window, new GLFWScrollCallback() {
+            @Override
+            public void invoke(long window, double xoffset, double yoffset) {
+                gui.onMouseScrolled(xoffset, yoffset);
+            }
+        });
+        glfwSetWindowFocusCallback(window, new GLFWWindowFocusCallback() {
+            @Override
+            public void invoke(long window, boolean focused) {
+                gui.onWindowFocused(focused);
+            }
+        });
+        glfwSetDropCallback(window, new GLFWDropCallback() {
+            @Override
+            public void invoke(long window, int count, long names) {
+                String[] files = new String[count];
+                for(int i = 0; i<files.length; i++){
+                    files[i] = GLFWDropCallback.getName(names, i);
+                }
+                gui.onFileDropped(files);
+            }
+        });
+    }
+    public boolean isKeyDown(int key){
+        return glfwGetKey(window, key)==GLFW_PRESS;
     }
 }

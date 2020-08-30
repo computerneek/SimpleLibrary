@@ -43,6 +43,7 @@ public class Sys{
     private static boolean useLWJGL;
     public static ErrorList suppressedErrors = new ErrorList();
     private static ErrorCategory[] suppress = new ErrorCategory[0];
+    private static boolean suppressUncaughtExceptionHandler;
     /**
      * @return the LWJGL flag; as in, if SimpleLibrary will use LWJGL where it can but doesn't have to
      */
@@ -190,7 +191,7 @@ public class Sys{
      */
     public static Config init(File root, ErrorHandler handler, String settings){
         init(root, handler);
-        Thread.setDefaultUncaughtExceptionHandler(Sys.getUncaughtExceptionHandler());
+        if(!suppressUncaughtExceptionHandler) Thread.setDefaultUncaughtExceptionHandler(Sys.getUncaughtExceptionHandler());
         Config config = settings==null?null:Config.loadConfig(settings);
         return config;
     }
@@ -205,7 +206,7 @@ public class Sys{
         }
         Sys.root = root;
         Sys.handler = checkHandler(handler);
-        Thread.setDefaultUncaughtExceptionHandler(getUncaughtExceptionHandler());
+        if(!suppressUncaughtExceptionHandler) Thread.setDefaultUncaughtExceptionHandler(getUncaughtExceptionHandler());
         initialized = true;
     }
     /**
@@ -221,7 +222,7 @@ public class Sys{
     public static Config initLWJGL(File root, ErrorHandler handler, String settings){
         Config config = init(root, handler, settings);
         useLWJGL = true;
-        System.out.println("Using LWJGL v"+org.lwjgl.Sys.getVersion());
+        System.out.println("Using LWJGL v"+org.lwjgl.Version.getVersion());
         return config;
     }
     /**
@@ -516,5 +517,12 @@ public class Sys{
         }
     }
     private Sys(){
+    }
+    /**
+     * Call before calling any init() function to block SimpleLibrary from overriding the default uncaught exception handler.  Error handling system will still initialize.
+     * To restore this function later, call Thread.setDefaultUncaughtExceptionHandler(Sys.getUncaughtExceptionHandler());
+     */
+    public static void suppressUncaughtExceptionHandler(){
+        suppressUncaughtExceptionHandler = true;
     }
 }

@@ -7,14 +7,14 @@ public class MenuComponentSlider extends MenuComponent{
     private static final Logger LOG = Logger.getLogger(MenuComponentSlider.class.getName());
     public boolean enabled;
     public double textInset = -1;
-    private double minimum;
-    private double maximum;
-    private double value;
-    private final int digits;
-    private boolean isPressed;
-    private double sliderHeight;
-    private double maxSliderX;
-    private double sliderX;
+    public double minimum;
+    public double maximum;
+    public double value;
+    public final int digits;
+    public boolean isPressed;
+    public double sliderHeight;
+    public double maxSliderX;
+    public double sliderX;
     public MenuComponentSlider(double x, double y, double width, double height, int minimum, int maximum, int initial, boolean enabled){
         super(x, y, width, height);
         this.minimum = minimum;
@@ -34,13 +34,21 @@ public class MenuComponentSlider extends MenuComponent{
         updateSlider();
     }
     @Override
-    public void mouseEvent(double x, double y, int button, boolean isDown){
-        if(button==0&&isDown==true&&enabled){
+    public void onMouseButton(double x, double y, int button, boolean pressed, int mods) {
+        if(button==0&&pressed&&enabled){
             isPressed = true;
             updateSlider(x);
-        }else if(button==0&&isDown==false&&isPressed&&enabled){
+        }else if(button==0&&!pressed){
             isPressed = false;
         }
+    }
+    @Override
+    public void onMouseMove(double x, double y) {
+        if(isPressed) updateSlider(x);
+    }
+    @Override
+    public void onMouseMovedElsewhere(double x, double y) {
+        if(isPressed) updateSlider(x);
     }
     @Override
     public void render(){
@@ -79,19 +87,6 @@ public class MenuComponentSlider extends MenuComponent{
         GL11.glColor3f(0, 0, 0);
         drawCenteredText(x+textInset, y+sliderHeight+textInset, x+width-textInset, y+height-textInset, getValueS());
         GL11.glColor3f(1, 1, 1);
-    }
-    @Override
-    public void mouseover(double x, double y, boolean isMouseOver){
-        super.mouseover(x, y, isMouseOver);
-        if(!isMouseOver){
-            isPressed = false;
-        }
-    }
-    @Override
-    public void mouseDragged(double x, double y, int button){
-        if(button==0&&enabled){
-            updateSlider(x);
-        }
     }
     private void updateSlider(double x){
         x-=sliderHeight/2;

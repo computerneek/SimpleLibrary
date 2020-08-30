@@ -14,6 +14,8 @@ public class MenuComponentButton extends MenuComponent implements ActionListener
     public boolean isPressed;
     public double textInset = -1;
     public boolean useMouseover = true;
+    public boolean actOnPress = DefaultActOnPress;
+    public static boolean DefaultActOnPress = false;
     protected String textureRoot = "/gui/button";
     private final ArrayList<ActionListener> listeners = new ArrayList<>();
     public MenuComponentButton(double x, double y, double width, double height, String label, boolean enabled){
@@ -30,13 +32,15 @@ public class MenuComponentButton extends MenuComponent implements ActionListener
         this.textureRoot = textureRoot;
     }
     @Override
-    public void mouseEvent(double x, double y, int button, boolean isDown){
-        if(button==0&&isDown==true&&enabled){
+    public void onMouseButton(double x, double y, int button, boolean pressed, int mods) {
+        if(pressed&&enabled&&button==0){
             isPressed = true;
-        }else if(button==0&&isDown==false&&isPressed&&enabled){
+            if(actOnPress) action();
+        }else if(button==0&&!pressed){
+            if(!actOnPress&&isPressed&&!Double.isNaN(x)) action();
             isPressed = false;
-            action();
         }
+        super.onMouseButton(x, y, button, pressed, mods); //To change body of generated methods, choose Tools | Templates.
     }
     @Override
     public void render(){
@@ -74,13 +78,6 @@ public class MenuComponentButton extends MenuComponent implements ActionListener
         GL11.glColor3f(foregroundColor.getRed()/255F, foregroundColor.getGreen()/255F, foregroundColor.getBlue()/255F);
         drawCenteredText(x+textInset, y+textInset, x+width-textInset, y+height-textInset, label);
         GL11.glColor3f(color.getRed()/255F, color.getGreen()/255F, color.getBlue()/255F);
-    }
-    @Override
-    public void mouseover(double x, double y, boolean isMouseOver){
-        super.mouseover(x, y, isMouseOver);
-        if(!isMouseOver){
-            isPressed = false;
-        }
     }
     /**
      * Called when the button is clicked.  The default implementation points to Menu.buttonClicked(MenuComponentButton), unless an ActionListener is present.
