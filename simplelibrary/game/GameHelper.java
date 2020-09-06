@@ -1,22 +1,12 @@
 package simplelibrary.game;
-import java.awt.Color;
-import java.awt.Dimension;
+import java.awt.Toolkit;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.ArrayList;
-import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import static org.lwjgl.glfw.GLFW.*;
-import org.lwjgl.glfw.GLFWCharCallback;
-import org.lwjgl.glfw.GLFWCursorPosCallback;
-import org.lwjgl.glfw.GLFWDropCallback;
-import org.lwjgl.glfw.GLFWErrorCallback;
-import org.lwjgl.glfw.GLFWKeyCallback;
-import org.lwjgl.glfw.GLFWMouseButtonCallback;
-import org.lwjgl.glfw.GLFWScrollCallback;
-import org.lwjgl.glfw.GLFWWindowFocusCallback;
+import org.lwjgl.glfw.*;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
 import simplelibrary.Sys;
@@ -25,7 +15,6 @@ import simplelibrary.error.ErrorLevel;
 import simplelibrary.opengl.ImageStash;
 import simplelibrary.opengl.Renderer2D;
 import simplelibrary.opengl.gui.GUI;
-import simplelibrary.window.WindowHelper;
 /**
  * An automatic tick & render management system, featuring full multithreading capability.
  * <hr>
@@ -243,7 +232,7 @@ public class GameHelper{
     private String windowTitle;
     public boolean running = true;
     private long lastTime;
-    private Color background = Color.BLACK;
+    private java.awt.Color background;
     private float frameOfView = 45;
     private int lastWidth;
     private int lastHeight;
@@ -281,7 +270,7 @@ public class GameHelper{
     private GLFWErrorCallback errCall;
     private long window;
     //</editor-fold>
-    public void setDisplaySize(Dimension size){
+    public void setDisplaySize(java.awt.Dimension size){
         setDisplaySize(size.width, size.height);
     }
     public void setDisplaySize(int displayWidth, int displayHeight){
@@ -322,7 +311,7 @@ public class GameHelper{
         }
         renderInitMethod = method;
     }
-    public void setBackground(Color background){
+    public void setBackground(java.awt.Color background){
         this.background = background;
         hasColorChanged = true;
     }
@@ -457,6 +446,14 @@ public class GameHelper{
         renderThread.start();
     }
     private void createDisplay(){
+//        Method m;
+//        try {
+//            m = ClassLoader.class.getDeclaredMethod("findLoadedClass", new Class[] { String.class });
+//            m.setAccessible(true);
+//            if(m.invoke(ClassLoader.getSystemClassLoader(), "java.awt.Toolkit")!=null){
+//                throw new RuntimeException("AWT cannot be initialized before GLFW!  Possible fix:  add org.lwjgl.glfw.GLFW.glfwInit() to the beginning of your main method.");
+//            }
+//        } catch (IllegalAccessException | IllegalArgumentException | NoSuchMethodException | SecurityException | InvocationTargetException ex) {}
         glfwInit();
         glfwSetErrorCallback(errCall=GLFWErrorCallback.createPrint(System.err));
         glfwWindowHint(GLFW_RESIZABLE, GL11.GL_TRUE);
@@ -500,6 +497,7 @@ public class GameHelper{
         glfwSwapBuffers(window);
     }
     public void refreshBackgroundColor(){
+        if(background==null) background = java.awt.Color.BLACK;
         GL11.glClearColor(background.getRed()/255F, background.getGreen()/255F, background.getBlue()/255F, background.getAlpha()/255F);
         hasColorChanged = false;
     }
@@ -664,10 +662,12 @@ public class GameHelper{
             else GL11.glMatrixMode(GL11.GL_MODELVIEW);
             ImageStash.instance.bindBuffer(name);
             GL11.glLoadIdentity();
-//            if(renderMode==MODE_2D){
-//                GL11.glScalef(1, -1, 1);
-//                GL11.glTranslatef(0, -height, 0);//Don't ask why, it just works
-//            }
+            if(renderMode==MODE_2D){
+                //For some reason, framebuffers have (0,0) in the lower left corner,
+                //  but the main display has it in the upper left, on the exact same init code.  This is the fix.
+                GL11.glScalef(1, -1, 1);
+                GL11.glTranslatef(0, -height, 0);
+            }
         }
     }
     public void assignGUI(GUI gui){

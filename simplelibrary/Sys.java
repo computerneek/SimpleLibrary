@@ -328,11 +328,23 @@ public class Sys{
         try (PrintWriter out=getErrorLog()) {
             out.println(message);
             if(error!=null){
+                out.println("error="+error.getClass().getName());
                 out.println("errorMessage="+error.getMessage());
                 StackTraceElement[] stack = error.getStackTrace();
-                out.println("stackSize="+stack.length);
                 for(StackTraceElement stack1:stack){
-                    out.println(stack1.toString());
+                    out.println(" at "+stack1.toString());
+                }
+                int sSize = stack.length;
+                while((error = error.getCause())!=null){
+                    out.println("causedBy="+error.getClass().getName());
+                    out.println("errorMessage="+error.getMessage());
+                    stack = error.getStackTrace();
+                    for(int i = 0; i<stack.length-sSize; i++){
+                        StackTraceElement stack1 = stack[i];
+                        out.println("  at "+stack1.toString());
+                    }
+                    out.println("    ..."+sSize+" more");
+                    sSize = stack.length;
                 }
             }else{
                 out.println("!!No Exception!!");
@@ -351,14 +363,29 @@ public class Sys{
      * @throws IOException if Java is not in the PATH environment variable
      */
     public static Process restart(String[] vmArgs, String[] applicationArgs, String[] additionalFiles, Class<?> mainClass) throws URISyntaxException, IOException{
+        return restart(vmArgs, applicationArgs, additionalFiles, mainClass, null);
+    }
+    /**
+     * Restarts the program.  This method will return normally if the program was properly restarted or throw an exception if it could not be restarted.
+     * @param vmArgs The VM arguments for the new instance
+     * @param applicationArgs The application arguments for the new instance
+     * @param additionalFiles Any additional files to include in the classpath
+     * @param mainClass The program's main class.  The new instance is started with this as the specified main class.
+     * @param workingDir The program's working directory
+     * @return The handle to the spawned process
+     * @throws URISyntaxException if a URI cannot be created to obtain the filepath to the jarfile
+     * @throws IOException if Java is not in the PATH environment variable
+     */
+    public static Process restart(String[] vmArgs, String[] applicationArgs, String[] additionalFiles, Class<?> mainClass, File workingDir) throws URISyntaxException, IOException{
         ArrayList<String> params = new ArrayList<>();
         params.add("java");
         params.addAll(Arrays.asList(vmArgs));
         params.add("-classpath");
         String filepath = mainClass.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
+        String separator = System.getProperty("path.separator");
         if(additionalFiles!=null){
             for(String str : additionalFiles){
-                filepath+=";"+str;
+                filepath+=separator+str;
             }
         }
         params.add(filepath);
