@@ -141,4 +141,16 @@ public class Queue<T> implements Iterable<T>{
     public Stream<T> stream() {
         return StreamSupport.stream(spliterator(), false);
     }
+    public Stream<T> streamContent(){
+        return StreamSupport.stream(Spliterators.spliteratorUnknownSize(new Iterator<T>() {
+            @Override
+            public boolean hasNext(){
+                return !isEmpty();
+            }
+            @Override
+            public T next(){
+                return dequeue();
+            }
+        }, Spliterator.ORDERED), false);
+    }
 }
