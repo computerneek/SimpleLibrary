@@ -203,10 +203,10 @@ public class ConfigNumberList extends ConfigBase{
                 size = abyte&0x3f;
                 break;
             case 1://Remaining 6 bits and next byte are the size- 0b01NNNNNN_NNNNNNNN
-                size = ((abyte&0x3f)<<8)+in.read();
+                size = ((abyte&0x3f)<<8)|in.read();
                 break;
             case 2://Remaining 6 bits and next 3 bytes are the size- 0b10NNNNNN_NNNNNNNN_NNNNNNNN_NNNNNNNN
-                size = ((abyte&0x3f)<<24)+(in.read()<<16)+in.readShort();//readShort() reads two bytes at once
+                size = ((abyte&0x3f)<<24)|(in.read()<<16)|(in.read()<<8)|in.read();
                 break;
             case 3://Next 4 bytes are the size- 0b11000000_NNNNNNNN_NNNNNNNN_NNNNNNNN_NNNNNNNN
                 size = in.readInt();

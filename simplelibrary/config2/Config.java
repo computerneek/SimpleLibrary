@@ -1,4 +1,6 @@
 package simplelibrary.config2;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -121,7 +123,7 @@ public class Config extends ConfigBase implements Cloneable{
         try{
             Config value;
             try (FileInputStream in=new FileInputStream(file)) {
-                value=load(in);
+                value=load(new BufferedInputStream(in));
             }
             return value;
         }catch(Throwable ex){
@@ -144,10 +146,10 @@ public class Config extends ConfigBase implements Cloneable{
             return false;
         }
     }
-    public  Config load(String path){
+    public Config load(String path){
         if(path.startsWith("/")){
             InputStream in = Config.class.getResourceAsStream(path);
-            Config value = load(in);
+            Config value = load(new BufferedInputStream(in));
             try{
                 in.close();
             }catch(Throwable ex){
@@ -158,7 +160,7 @@ public class Config extends ConfigBase implements Cloneable{
             return load(new File(path));
         }
     }
-    public  boolean save(String path){
+    public boolean save(String path){
         if(path.startsWith("/")){
             try{
                 URL resource = Config.class.getResource(path);
@@ -209,14 +211,16 @@ public class Config extends ConfigBase implements Cloneable{
         }
         return this;
     }
-    public  boolean save(OutputStream out){
+    public boolean save(OutputStream out){
         if(out==null){
             throw new IllegalArgumentException("Output stream cannot be null!");
         }
+        out = new BufferedOutputStream(out);
         DataOutputStream dataOut = new DataOutputStream(out);
         try{
             dataOut.writeShort(CONFIG_VERSION);
             write(dataOut);
+            out.flush();//Make sure it's actually written
         }catch(Throwable ex){
             Sys.error(ErrorLevel.moderate, "Could not save config!", ex, ErrorCategory.config);
             return false;
